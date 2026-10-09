@@ -172,6 +172,24 @@ class ScheduleSpec(BaseModel):
         return self
 
 
+class LeakSpec(BaseModel):
+    """Fugas: tasa mensual de Poisson, caudal, tiempo de reparación y reporte de la comunidad."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    rate_per_month: float = Field(ge=0)
+    flow_m3_per_hour: float = Field(gt=0)
+    repair_days_min: int = Field(ge=1)
+    repair_days_max: int = Field(ge=1)
+    report_probability_per_day: float = Field(gt=0, le=1)
+
+    @model_validator(mode="after")
+    def _repair_range_is_forward(self) -> Self:
+        if self.repair_days_min > self.repair_days_max:
+            raise ValueError("repair_days_min no puede ser mayor que repair_days_max")
+        return self
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -184,6 +202,7 @@ class Scenario(BaseModel):
     sectors: list[SectorSpec] = Field(min_length=1)
     demand: DemandSpec
     schedule: ScheduleSpec
+    leaks: LeakSpec
 
     @model_validator(mode="after")
     def _sector_references_are_valid(self) -> Self:

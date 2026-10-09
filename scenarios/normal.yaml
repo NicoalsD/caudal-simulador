@@ -92,3 +92,15 @@ schedule:
   p_completed: 0.80
   p_partial: 0.15
   p_not_executed: 0.05
+
+leaks:
+  # Fugas nuevas por mes (tasa de un proceso de Poisson). Supuesto, verificar con la historia
+  # del acueducto.
+  rate_per_month: 0.8
+  # Caudal de una fuga, en m³ por hora. Supuesto, verificar con medición.
+  flow_m3_per_hour: 0.3
+  # Días que tarda la reparación: un entero al azar entre el mínimo y el máximo. Supuesto.
+  repair_days_min: 1
+  repair_days_max: 5
+  # Probabilidad diaria de que una familia reporte la fuga a la comunidad. Supuesto.
+  report_probability_per_day: 0.3
