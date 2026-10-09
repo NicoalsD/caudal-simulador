@@ -17,7 +17,7 @@ from caudal_sim.clock import SimulationClock
 from caudal_sim.export import export_run
 from caudal_sim.terrain import SimulationRun, run_simulation
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 RUN_DAYS = 10
 PROPERTY_DAYS = 2

@@ -13,7 +13,7 @@ from caudal_sim.clock import HOURS_PER_DAY
 from caudal_sim.scenario import ScheduleSpec, TurnSpec
 from caudal_sim.shifts import ShiftOutcome, ShiftSimulator
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 LONG_RUN_DAYS = 2000
 OUTCOME_TOLERANCE = 0.03

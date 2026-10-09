@@ -7,7 +7,7 @@ import numpy as np
 from caudal_sim.builder import ScenarioBuilder
 from caudal_sim.terrain import run_simulation
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 LIMIT_DAYS = 120
 STRONG_RAIN_GAIN = 50.0
 HUGE_DEMAND_LITERS = 10_000

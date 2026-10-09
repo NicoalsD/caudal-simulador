@@ -11,7 +11,7 @@ from caudal_sim.clock import HOURS_PER_DAY
 from caudal_sim.leaks import DAYS_PER_MONTH, LeakProcess
 from caudal_sim.scenario import LeakSpec
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 LONG_RUN_DAYS = 3000
 HIGH_RATE_PER_MONTH = 3.0

@@ -4,7 +4,7 @@
 # Values marked "assumption, verify" do not come from measurement.
 
 meta:
-  name: normal
+  name: normal-year
   description: Operación típica con régimen bimodal. Línea base de las pruebas.
   # Time zone of the aqueduct (Colombia has no daylight saving time).
   timezone: America/Bogota

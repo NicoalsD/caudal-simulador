@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 from caudal_sim.builder import load_scenario
 from caudal_sim.tank import Tank
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 MASS_TOLERANCE_M3 = 1e-9
 LEVEL_TOLERANCE_M = 1e-9
 MAX_FLOW_M3_PER_HOUR = 5.0

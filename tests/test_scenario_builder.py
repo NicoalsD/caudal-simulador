@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 from caudal_sim.builder import ScenarioBuilder, load_scenario
 from caudal_sim.scenario import Scenario, ScenarioError
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 OVERRIDDEN_GAUGE = 1.5
 OVERRIDDEN_SEED = 7

@@ -11,7 +11,7 @@ from caudal_sim.clock import HOURS_PER_DAY
 from caudal_sim.readings import GaussianRoundingReadingModel, take_readings
 from caudal_sim.scenario import Scenario
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 LEVEL_LOW_M = -1.0
 LEVEL_HIGH_M = 7.0

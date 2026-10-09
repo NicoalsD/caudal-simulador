@@ -10,7 +10,7 @@ from caudal_sim.builder import load_scenario
 from caudal_sim.clock import HOURS_PER_DAY
 from caudal_sim.demand import LITERS_PER_CUBIC_METER, SectorDemandModel
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 SIMULATED_DAYS = 3
 VOLUME_TOLERANCE_M3 = 1e-9

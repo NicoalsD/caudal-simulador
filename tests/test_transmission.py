@@ -16,7 +16,7 @@ from caudal_sim.readings import (
 )
 from caudal_sim.scenario import ReadingSpec
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SEED_MAX = 2**32 - 1
 LONG_RUN_DAYS = 2000
 RATE_TOLERANCE = 0.01

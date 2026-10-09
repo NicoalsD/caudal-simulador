@@ -16,7 +16,7 @@ from caudal_sim.terrain import run_simulation
 
 SCENARIOS_DIR = Path("scenarios")
 SCENARIO_SUFFIX = ".yaml"
-DEFAULT_SCENARIO = "normal"
+DEFAULT_SCENARIO = "normal-year"
 DEFAULT_DAYS = 365
 MIN_DAYS = 1
 DEFAULT_OUTPUT = Path("outputs")

@@ -11,7 +11,7 @@ from caudal_sim.readings import TransmittedReading
 from caudal_sim.shifts import ShiftExecution
 from caudal_sim.terrain import DamageReport, ObservedData, TruthData, run_simulation
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SIMULATED_DAYS = 30
 SEED = 42
 TRUTH_ONLY_WORDS = (

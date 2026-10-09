@@ -10,7 +10,7 @@ from caudal_sim.builder import load_scenario
 from caudal_sim.export import FORMATS, MANIFEST_NAME, export_run
 from caudal_sim.terrain import SimulationRun, run_simulation
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SIMULATED_DAYS = 5
 SEED = 7
 

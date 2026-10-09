@@ -7,7 +7,7 @@ import numpy as np
 from caudal_sim.builder import load_scenario
 from caudal_sim.terrain import run_simulation
 
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 YEAR_DAYS = 365
 SEED = 42
 MAX_OVERFLOW_HOUR_FRACTION = 0.10

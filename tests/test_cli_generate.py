@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 from caudal_sim.cli import app
 
 runner = CliRunner()
-NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal.yaml"
+NORMAL_YAML = Path(__file__).resolve().parents[1] / "scenarios" / "normal-year.yaml"
 SMOKE_DAYS = "3"
 SEED = "11"
 SUCCESS = 0

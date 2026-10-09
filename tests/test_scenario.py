@@ -8,14 +8,14 @@ from caudal_sim.builder import load_scenario
 from caudal_sim.scenario import Scenario, ScenarioError
 
 SCENARIOS_DIR = Path(__file__).resolve().parents[1] / "scenarios"
-NORMAL_YAML = SCENARIOS_DIR / "normal.yaml"
+NORMAL_YAML = SCENARIOS_DIR / "normal-year.yaml"
 EXPECTED_GAUGE_MAX = 5.0
 
 
 def _write_variant(tmp_path: Path, old: str, new: str) -> Path:
-    """Copies normal.yaml changing a single fragment, to test a specific error."""
+    """Copies normal-year.yaml changing a single fragment, to test a specific error."""
     text = NORMAL_YAML.read_text(encoding="utf-8")
-    assert old in text, f"el fragmento {old!r} no está en normal.yaml"
+    assert old in text, f"el fragmento {old!r} no está en normal-year.yaml"
     path = tmp_path / "variant.yaml"
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
     return path
