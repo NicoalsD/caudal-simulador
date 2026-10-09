@@ -43,3 +43,37 @@ class NoisySensor:
 
     def read(self, at: datetime) -> float:
         return self._inner.read(at) + float(self._rng.normal(0.0, self._sigma_m))
+
+
+class StuckSensor:
+    """Freezes the reading of another sensor inside a window: the first value read stays.
+
+    Outside the window the decorator passes the inner readings through. The frozen value is
+    part of the state, so a snapshot taken inside the window keeps it.
+
+    @pattern P09 Decorator
+    """
+
+    def __init__(self, inner: Sensor, stuck_from: datetime, stuck_until: datetime) -> None:
+        if stuck_until <= stuck_from:
+            raise ValueError("la ventana del valor pegado debe terminar después de empezar")
+        self._inner = inner
+        self._stuck_from = stuck_from
+        self._stuck_until = stuck_until
+        self._frozen: float | None = None
+
+    def read(self, at: datetime) -> float:
+        if not self._stuck_from <= at < self._stuck_until:
+            self._frozen = None
+            return self._inner.read(at)
+        if self._frozen is None:
+            self._frozen = self._inner.read(at)
+        return self._frozen
+
+    def capture(self) -> float | None:
+        """Frozen value, or None when the sensor is not stuck."""
+        return self._frozen
+
+    def restore(self, state: float | None) -> None:
+        """Puts back the frozen value saved in a snapshot."""
+        self._frozen = state
