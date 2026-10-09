@@ -6,6 +6,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol
 
+import numpy as np
+
 
 class Sensor(Protocol):
     """Interface of every sensor, including the decorators that wrap another sensor."""
@@ -22,3 +24,22 @@ class SourceSensor:
 
     def read(self, at: datetime) -> float:
         return self._source(at)
+
+
+class NoisySensor:
+    """Adds Gaussian noise to the reading of another sensor, for example the ADS1115 quantization.
+
+    The noise comes from the shared random generator of the run, so it depends on the seed.
+
+    @pattern P09 Decorator
+    """
+
+    def __init__(self, inner: Sensor, rng: np.random.Generator, sigma_m: float) -> None:
+        if sigma_m < 0:
+            raise ValueError("la desviación del ruido no puede ser negativa")
+        self._inner = inner
+        self._rng = rng
+        self._sigma_m = sigma_m
+
+    def read(self, at: datetime) -> float:
+        return self._inner.read(at) + float(self._rng.normal(0.0, self._sigma_m))
