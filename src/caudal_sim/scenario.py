@@ -5,12 +5,10 @@ para que un error de escritura en el YAML no pase en silencio.
 """
 
 from datetime import date
-from pathlib import Path
 from typing import Literal, Self
 from zoneinfo import ZoneInfo
 
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ScenarioError(ValueError):
@@ -68,25 +66,3 @@ class Scenario(BaseModel):
 
     meta: ScenarioMeta
     tank: TankSpec
-
-
-def load_scenario(path: Path) -> Scenario:
-    """Lee un escenario YAML y lo valida. Lanza ScenarioError con el motivo en español."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as error:
-        raise ScenarioError(f"no se puede leer el escenario {path}") from error
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError as error:
-        raise ScenarioError(f"YAML inválido en {path}: {error}") from error
-    if not isinstance(raw, dict):
-        raise ScenarioError(f"el escenario {path} debe ser un mapa YAML")
-    try:
-        return Scenario.model_validate(raw)
-    except ValidationError as error:
-        detalles = "; ".join(
-            f"{'.'.join(str(parte) for parte in item['loc'])}: {item['msg']}"
-            for item in error.errors()
-        )
-        raise ScenarioError(f"escenario inválido {path}: {detalles}") from error

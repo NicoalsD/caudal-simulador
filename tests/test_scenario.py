@@ -4,7 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from caudal_sim.scenario import Scenario, ScenarioError, load_scenario
+from caudal_sim.builder import load_scenario
+from caudal_sim.scenario import Scenario, ScenarioError
 
 SCENARIOS_DIR = Path(__file__).resolve().parents[1] / "scenarios"
 NORMAL_YAML = SCENARIOS_DIR / "normal.yaml"
