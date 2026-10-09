@@ -49,10 +49,12 @@ climate:
     - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}
 
 source:
-  # Caudal base de la fuente, en m³ por hora (unos 0,6 L/s). Supuesto, verificar con aforo.
-  base_flow_m3_per_hour: 2.2
+  # Caudal base de la fuente, en m³ por hora (unos 0,1 L/s). Supuesto, verificar con aforo.
+  # Calibrado para que la entrada media se parezca a la entrega media. Ver
+  # tests/test_normal_scenario.py.
+  base_flow_m3_per_hour: 0.4
   # Aumento del caudal por cada mm de lluvia, con retardo. Supuesto, verificar con aforo.
-  rain_gain_m3_per_hour_per_mm: 0.15
+  rain_gain_m3_per_hour_per_mm: 0.03
   # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar. Supuesto.
   response_lag_hours: 36
   # Lluvia de un día, en mm, a partir de la cual el agua llega con barro. Supuesto.
