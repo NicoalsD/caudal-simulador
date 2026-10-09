@@ -9,6 +9,8 @@ description = "Simulador de datos del acueducto veredal de Guaitarilla (CAUDAL).
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "numpy==2.5.3",
+    "pandas==3.0.6",
+    "pyarrow==26.0.0",
     "pydantic==2.14.0",
     "pyyaml==6.0.3",
     "typer==0.27.3",
@@ -24,6 +26,7 @@ packages = ["src/caudal_sim"]
 dev = [
     "hypothesis==6.168.5",
     "mypy==2.4.0",
+    "pandas-stubs==3.0.5.260914",
     "pytest==9.1.1",
     "ruff==0.16.10",
     "types-pyyaml==6.0.12.20260906",

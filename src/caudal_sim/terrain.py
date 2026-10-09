@@ -78,6 +78,8 @@ class SimulationRun:
     """Una corrida completa: metadatos, datos observados y verdad de terreno."""
 
     scenario_name: str
+    timezone: str
+    start: datetime
     seed: int
     days: int
     observed: ObservedData
@@ -143,6 +145,8 @@ def run_simulation(scenario: Scenario, days: int, seed: int) -> SimulationRun:
 
     return SimulationRun(
         scenario_name=scenario.meta.name,
+        timezone=scenario.meta.timezone,
+        start=start,
         seed=seed,
         days=days,
         observed=ObservedData(
