@@ -49,8 +49,8 @@ climate:
     - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}
 
 source:
-  # Caudal base de la fuente, en m³ por hora (unos 0,33 L/s). Supuesto, verificar con aforo.
-  base_flow_m3_per_hour: 1.2
+  # Caudal base de la fuente, en m³ por hora (unos 0,6 L/s). Supuesto, verificar con aforo.
+  base_flow_m3_per_hour: 2.2
   # Aumento del caudal por cada mm de lluvia, con retardo. Supuesto, verificar con aforo.
   rain_gain_m3_per_hour_per_mm: 0.15
   # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar. Supuesto.
@@ -59,3 +59,22 @@ source:
   muddy_rain_threshold_mm: 20.0
   # Horas que dura el agua con barro después de una lluvia fuerte. Supuesto.
   muddy_duration_hours: 48
+
+sectors:
+  # Sectores de la vereda. Cada uno tiene una válvula (ver la sección de turnos).
+  # Número de hogares: supuesto, verificar con censo local.
+  - {id: alto, name: Sector Alto, households: 38}
+  - {id: centro, name: Sector Centro, households: 52}
+  - {id: bajo, name: Sector Bajo, households: 45}
+
+demand:
+  # Dotación por persona, en litros por día. Valor de referencia de la RAS 0330/2017 para
+  # más de 2.000 msnm. Supuesto, verificar en la norma vigente.
+  liters_per_person_per_day: 100
+  # Personas por hogar: sorteo entero entre el mínimo y el máximo. Supuesto, verificar.
+  persons_min: 3
+  persons_max: 4
+  # Perfil horario (pesos relativos, de la hora 0 a la 23). Pico matutino y vespertino.
+  # Supuesto, verificar con la Junta.
+  hourly_weights: [0.5, 0.4, 0.3, 0.3, 0.5, 1.5, 3.0, 3.5, 2.5, 1.5, 1.2, 1.5,
+                   2.0, 1.5, 1.2, 1.2, 1.5, 2.8, 3.2, 2.5, 1.5, 1.0, 0.8, 0.6]

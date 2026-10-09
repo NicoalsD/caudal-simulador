@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from caudal_sim.clock import HOURS_PER_DAY
+
 
 class ScenarioError(ValueError):
     """Un escenario no se puede leer o no pasa la validación. El mensaje va en español."""
@@ -101,6 +103,38 @@ class SourceSpec(BaseModel):
     muddy_duration_hours: int = Field(ge=1)
 
 
+class SectorSpec(BaseModel):
+    """Sector del acueducto: un grupo de hogares que comparte una válvula."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str = Field(pattern=r"^[a-z][a-z0-9-]*$", min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=64)
+    households: int = Field(ge=1)
+
+
+class DemandSpec(BaseModel):
+    """Demanda de agua: dotación por persona, personas por hogar y perfil horario."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    liters_per_person_per_day: float = Field(gt=0)
+    persons_min: int = Field(ge=1)
+    persons_max: int = Field(ge=1)
+    # Pesos relativos de cada hora del día (0 a 23). El código los normaliza a fracciones.
+    hourly_weights: list[float] = Field(min_length=HOURS_PER_DAY, max_length=HOURS_PER_DAY)
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        if self.persons_min > self.persons_max:
+            raise ValueError("persons_min no puede ser mayor que persons_max")
+        if any(weight < 0 for weight in self.hourly_weights) or sum(self.hourly_weights) <= 0:
+            raise ValueError(
+                "hourly_weights no puede tener valores negativos y debe sumar más de 0"
+            )
+        return self
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -110,3 +144,12 @@ class Scenario(BaseModel):
     tank: TankSpec
     climate: ClimateSpec
     source: SourceSpec
+    sectors: list[SectorSpec] = Field(min_length=1)
+    demand: DemandSpec
+
+    @model_validator(mode="after")
+    def _unique_sector_ids(self) -> Self:
+        ids = [sector.id for sector in self.sectors]
+        if len(ids) != len(set(ids)):
+            raise ValueError("los identificadores de sector deben ser únicos")
+        return self
