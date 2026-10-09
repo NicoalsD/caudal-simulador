@@ -19,7 +19,9 @@ packages = ["src/caudal_sim"]
 
 [dependency-groups]
 dev = [
+    "hypothesis==6.168.5",
     "mypy==2.4.0",
+    "pytest==9.1.1",
     "ruff==0.16.10",
 ]
 
@@ -35,3 +37,7 @@ select = ["E", "W", "F", "I", "B", "UP", "N", "SIM", "PL", "RUF", "ANN"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]

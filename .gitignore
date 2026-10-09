@@ -38,3 +38,6 @@ outputs/
 # Tablero (Node / Vite)
 dashboard/node_modules/
 dashboard/dist/
+
+# Hypothesis (base de ejemplos de las pruebas de propiedades)
+.hypothesis/
