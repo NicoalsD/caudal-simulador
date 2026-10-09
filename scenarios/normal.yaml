@@ -78,3 +78,17 @@ demand:
   # Supuesto, verificar con la Junta.
   hourly_weights: [0.5, 0.4, 0.3, 0.3, 0.5, 1.5, 3.0, 3.5, 2.5, 1.5, 1.2, 1.5,
                    2.0, 1.5, 1.2, 1.2, 1.5, 2.8, 3.2, 2.5, 1.5, 1.0, 0.8, 0.6]
+
+schedule:
+  # Horario publicado que se repite cada día. Cada turno abre la válvula de un sector
+  # entre start_hour y end_hour (horas del día, de 0 a 24). Supuesto, verificar con la Junta.
+  turns:
+    - {sector: alto, start_hour: 5, end_hour: 9}
+    - {sector: centro, start_hour: 9, end_hour: 13}
+    - {sector: bajo, start_hour: 13, end_hour: 17}
+    - {sector: alto, start_hour: 17, end_hour: 21}
+  # Cumplimiento del fontanero por turno: cumplido, a medias o no cumplido. Deben sumar 1.
+  # Supuesto, verificar con el registro de la Junta.
+  p_completed: 0.80
+  p_partial: 0.15
+  p_not_executed: 0.05

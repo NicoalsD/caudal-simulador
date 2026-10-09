@@ -135,6 +135,43 @@ class DemandSpec(BaseModel):
         return self
 
 
+PROBABILITY_SUM_TOLERANCE = 1e-9
+
+
+class TurnSpec(BaseModel):
+    """Turno publicado: abre la válvula de un sector en una ventana de horas del día."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    sector: str = Field(pattern=r"^[a-z][a-z0-9-]*$", min_length=1, max_length=32)
+    start_hour: int = Field(ge=0, le=HOURS_PER_DAY - 1)
+    end_hour: int = Field(ge=1, le=HOURS_PER_DAY)
+
+    @model_validator(mode="after")
+    def _window_is_forward(self) -> Self:
+        if self.start_hour >= self.end_hour:
+            raise ValueError("start_hour debe ser menor que end_hour")
+        return self
+
+
+class ScheduleSpec(BaseModel):
+    """Horario publicado y probabilidades de cumplimiento de cada turno."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    turns: list[TurnSpec] = Field(min_length=1)
+    p_completed: float = Field(ge=0, le=1)
+    p_partial: float = Field(ge=0, le=1)
+    p_not_executed: float = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _probabilities_sum_to_one(self) -> Self:
+        total = self.p_completed + self.p_partial + self.p_not_executed
+        if abs(total - 1.0) > PROBABILITY_SUM_TOLERANCE:
+            raise ValueError("p_completed, p_partial y p_not_executed deben sumar 1")
+        return self
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -146,10 +183,14 @@ class Scenario(BaseModel):
     source: SourceSpec
     sectors: list[SectorSpec] = Field(min_length=1)
     demand: DemandSpec
+    schedule: ScheduleSpec
 
     @model_validator(mode="after")
-    def _unique_sector_ids(self) -> Self:
+    def _sector_references_are_valid(self) -> Self:
         ids = [sector.id for sector in self.sectors]
         if len(ids) != len(set(ids)):
             raise ValueError("los identificadores de sector deben ser únicos")
+        unknown = sorted({turn.sector for turn in self.schedule.turns} - set(ids))
+        if unknown:
+            raise ValueError(f"el horario usa sectores que no existen: {', '.join(unknown)}")
         return self
