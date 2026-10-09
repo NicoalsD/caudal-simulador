@@ -8,12 +8,14 @@ responses carry simulated data only: no usernames, tokens, keys or personal data
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from caudal_sim import __version__
+from caudal_sim.dashboard_events import MAX_STREAM_EVENTS, SSE_CONTENT_TYPE, stream_frames
 from caudal_sim.dashboard_session import DashboardSession
 
 API_TITLE = "API del tablero del simulador CAUDAL"
@@ -23,6 +25,8 @@ API_DESCRIPTION = (
 )
 SIMULATED_NOTICE = "Datos simulados"
 STATE_PATH = "/api/tablero/estado"
+EVENTS_PATH = "/api/tablero/eventos"
+NO_CACHE_HEADER = {"Cache-Control": "no-cache"}
 TAG_DASHBOARD = "Tablero"
 
 
@@ -85,5 +89,32 @@ def create_dashboard_app(session: DashboardSession) -> FastAPI:
                 for valve in snapshot.valves
             ],
         )
+
+    @app.get(
+        EVENTS_PATH,
+        tags=[TAG_DASHBOARD],
+        summary="Eventos en vivo (SSE)",
+        description=(
+            "Flujo `text/event-stream` con los eventos del bus de la simulación: cambios de "
+            "válvula, comandos entregados y confirmados. Cada evento es un nombre SSE igual a "
+            "su tipo. Si el cliente se queda atrás, llega un evento `DROPPED` con los eventos "
+            "perdidos. `max_events` cierra el flujo después de esa cantidad (para pruebas)."
+        ),
+        responses={200: {"content": {SSE_CONTENT_TYPE: {}}, "description": "Flujo de eventos."}},
+        response_class=StreamingResponse,
+    )
+    async def stream_events(
+        request: Request,
+        max_events: Annotated[
+            int | None,
+            Query(ge=1, le=MAX_STREAM_EVENTS, description="Cierra el flujo tras esta cantidad."),
+        ] = None,
+    ) -> StreamingResponse:
+        frames = stream_frames(
+            session.bus,
+            is_disconnected=request.is_disconnected,
+            max_events=max_events,
+        )
+        return StreamingResponse(frames, media_type=SSE_CONTENT_TYPE, headers=NO_CACHE_HEADER)
 
     return app
