@@ -26,3 +26,22 @@ tank:
   gauge_step: 0.1
   # Nivel al inicio de la simulación, en metros. Supuesto, verificar.
   initial_gauge: 3.4
+
+climate:
+  # Régimen bimodal andino: dos temporadas de lluvia al año (abril-mayo y octubre-noviembre).
+  # Supuesto, verificar con datos del IDEAM o de una estación cercana.
+  # p_wet_after_dry: probabilidad de que un día seco sea húmedo (llueva).
+  # p_wet_after_wet: probabilidad de que un día húmedo siga húmedo.
+  monthly:
+    - {month: 1, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
+    - {month: 2, p_wet_after_dry: 0.30, p_wet_after_wet: 0.50}
+    - {month: 3, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60}
+    - {month: 4, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
+    - {month: 5, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
+    - {month: 6, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55}
+    - {month: 7, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
+    - {month: 8, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
+    - {month: 9, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55}
+    - {month: 10, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
+    - {month: 11, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
+    - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60}

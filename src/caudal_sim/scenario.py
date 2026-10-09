@@ -59,6 +59,34 @@ class TankSpec(BaseModel):
         return self
 
 
+MONTHS_PER_YEAR = 12
+
+
+class MonthClimate(BaseModel):
+    """Probabilidades de lluvia de un mes. Cada día húmedo o seco depende del día anterior."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    month: int = Field(ge=1, le=MONTHS_PER_YEAR)
+    p_wet_after_dry: float = Field(ge=0, le=1)
+    p_wet_after_wet: float = Field(ge=0, le=1)
+
+
+class ClimateSpec(BaseModel):
+    """Clima del escenario: una fila por mes, de enero (1) a diciembre (12)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    monthly: list[MonthClimate]
+
+    @model_validator(mode="after")
+    def _one_row_per_month(self) -> Self:
+        months = sorted(row.month for row in self.monthly)
+        if months != list(range(1, MONTHS_PER_YEAR + 1)):
+            raise ValueError("climate.monthly debe tener exactamente una fila por mes (1 a 12)")
+        return self
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -66,3 +94,4 @@ class Scenario(BaseModel):
 
     meta: ScenarioMeta
     tank: TankSpec
+    climate: ClimateSpec
