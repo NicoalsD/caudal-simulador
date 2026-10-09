@@ -128,6 +128,29 @@ def backfill_readings(
     _run_backfill(ImportKind.READINGS, scenario, days, seed, dry_run)
 
 
+@backfill_app.command("shift-executions")
+def backfill_shift_executions(
+    scenario: Annotated[
+        str,
+        typer.Option(help="Nombre del escenario (scenarios/<nombre>.yaml) o ruta a un archivo."),
+    ] = DEFAULT_SCENARIO,
+    days: Annotated[
+        int,
+        typer.Option(help="Días de historial a importar.", min=MIN_DAYS),
+    ] = DEFAULT_BACKFILL_DAYS,
+    seed: Annotated[
+        int | None,
+        typer.Option(help="Semilla. Por defecto, la del escenario."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Cuenta los lotes sin contactar la API."),
+    ] = False,
+) -> None:
+    """Importa ejecuciones de turnos simuladas al acueducto demo."""
+    _run_backfill(ImportKind.SHIFT_EXECUTIONS, scenario, days, seed, dry_run)
+
+
 def _run_backfill(
     kind: ImportKind, scenario: str, days: int, seed: int | None, dry_run: bool
 ) -> None:

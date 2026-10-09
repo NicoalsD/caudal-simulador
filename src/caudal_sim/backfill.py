@@ -43,10 +43,12 @@ class ImportKind(StrEnum):
     """Kinds of history the API imports, named as the CLI subcommands."""
 
     READINGS = "readings"
+    SHIFT_EXECUTIONS = "shift-executions"
 
 
 IMPORT_PATHS: dict[ImportKind, str] = {
     ImportKind.READINGS: "/api/v1/imports/readings",
+    ImportKind.SHIFT_EXECUTIONS: "/api/v1/imports/shift-executions",
 }
 
 
@@ -121,6 +123,8 @@ def rows_for(
             for reading in run.observed.readings
             if not reading.is_duplicate
         ]
+    if kind is ImportKind.SHIFT_EXECUTIONS:
+        return [adapter.shift_execution_row(shift) for shift in run.observed.shift_executions]
     raise ValueError(f"Tipo de importación no soportado: {kind}")
 
 
@@ -144,7 +148,7 @@ def run_backfill(
     )
     adapter = ApiPayloadAdapter(context)
     rows = rows_for(kind, run, adapter)
-    duplicates = _duplicate_count(run)
+    duplicates = _duplicate_count(kind, run)
     path = IMPORT_PATHS[kind]
     metadata = BatchMetadata(
         aqueduct_id=settings.aqueduct_id, scenario_name=run.scenario_name, seed=run.seed
@@ -188,8 +192,10 @@ def _count(response: Mapping[str, Any], key: str) -> int:
     return value
 
 
-def _duplicate_count(run: SimulationRun) -> int:
-    return sum(1 for reading in run.observed.readings if reading.is_duplicate)
+def _duplicate_count(kind: ImportKind, run: SimulationRun) -> int:
+    if kind is ImportKind.READINGS:
+        return sum(1 for reading in run.observed.readings if reading.is_duplicate)
+    return 0
 
 
 def _make_batch(
