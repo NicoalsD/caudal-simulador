@@ -16,13 +16,14 @@ from caudal_sim.api_client import encode_json
 from caudal_sim.backfill import (
     MAX_IMPORT_BODY_BYTES,
     MAX_IMPORT_ROWS,
+    SHA256_HEX_LENGTH,
     BatchMetadata,
     ImportKind,
     build_batches,
     run_backfill,
 )
 from caudal_sim.builder import load_scenario
-from caudal_sim.cli import app
+from caudal_sim.cli import EXIT_CONFIG_ERROR, EXIT_IMPORT_ERROR, app
 from caudal_sim.config import SimulatorSettings
 from caudal_sim.demo_guard import NonDemoTargetError
 from caudal_sim.terrain import run_simulation
@@ -109,7 +110,7 @@ def test_each_batch_hash_is_the_sha256_of_its_own_rows() -> None:
 
     expected = hashlib.sha256(encode_json({"rows": rows})).hexdigest()
     assert batch.file_sha256 == expected
-    assert len(batch.file_sha256) == 64
+    assert len(batch.file_sha256) == SHA256_HEX_LENGTH
     assert set(batch.file_sha256) <= HEX_DIGITS
 
 
@@ -179,7 +180,7 @@ def test_cli_reports_missing_configuration_in_spanish(
         app, ["backfill", "readings", "--scenario", str(NORMAL_YAML), "--dry-run"]
     )
 
-    assert result.exit_code == 2
+    assert result.exit_code == EXIT_CONFIG_ERROR
     assert "CAUDAL_SIM_API_USERNAME" in result.output
 
 
@@ -191,7 +192,7 @@ def test_cli_real_run_aborts_with_spanish_message_for_a_real_aqueduct(
         _demo_router(router, is_demo=False)
         result = CliRunner().invoke(app, ["backfill", "readings", "--days", "1"])
 
-    assert result.exit_code == 3
+    assert result.exit_code == EXIT_IMPORT_ERROR
     assert "no es el acueducto de demostración" in result.output
 
 
