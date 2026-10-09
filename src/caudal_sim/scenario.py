@@ -89,6 +89,18 @@ class ClimateSpec(BaseModel):
         return self
 
 
+class SourceSpec(BaseModel):
+    """Fuente: caudal base, respuesta a la lluvia con retardo y umbral de agua con barro."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    base_flow_m3_per_hour: float = Field(ge=0)
+    rain_gain_m3_per_hour_per_mm: float = Field(ge=0)
+    response_lag_hours: float = Field(gt=0)
+    muddy_rain_threshold_mm: float = Field(ge=0)
+    muddy_duration_hours: int = Field(ge=1)
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -97,3 +109,4 @@ class Scenario(BaseModel):
     meta: ScenarioMeta
     tank: TankSpec
     climate: ClimateSpec
+    source: SourceSpec

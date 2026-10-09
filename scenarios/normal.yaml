@@ -47,3 +47,15 @@ climate:
     - {month: 10, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
     - {month: 11, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
     - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}
+
+source:
+  # Caudal base de la fuente, en m³ por hora (unos 0,33 L/s). Supuesto, verificar con aforo.
+  base_flow_m3_per_hour: 1.2
+  # Aumento del caudal por cada mm de lluvia, con retardo. Supuesto, verificar con aforo.
+  rain_gain_m3_per_hour_per_mm: 0.15
+  # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar. Supuesto.
+  response_lag_hours: 36
+  # Lluvia de un día, en mm, a partir de la cual el agua llega con barro. Supuesto.
+  muddy_rain_threshold_mm: 20.0
+  # Horas que dura el agua con barro después de una lluvia fuerte. Supuesto.
+  muddy_duration_hours: 48

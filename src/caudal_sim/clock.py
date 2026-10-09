@@ -9,6 +9,7 @@ from typing import ClassVar
 import numpy as np
 
 RNG_STREAM_NAME_ENCODING = "utf-8"
+HOURS_PER_DAY = 24
 
 
 class SimulationClock:
