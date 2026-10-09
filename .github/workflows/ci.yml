@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  simulador:
+    name: Simulador (formato, tipos y pruebas)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+
+      - name: Instala dependencias bloqueadas
+        run: uv sync --locked
+
+      - name: Valida formato y reglas de estilo
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Valida tipos
+        run: uv run mypy src
+
+      - name: Ejecuta las pruebas
+        run: uv run pytest
