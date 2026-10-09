@@ -12,6 +12,7 @@ from pydantic import ValidationError
 from caudal_sim import __version__
 from caudal_sim.api_client import ApiError
 from caudal_sim.backfill import BackfillOptions, ImportKind, ImportLimitError, run_backfill
+from caudal_sim.backtest import export_backtest_windows
 from caudal_sim.builder import ScenarioBuilder
 from caudal_sim.config import ENV_PREFIX, SimulatorSettings
 from caudal_sim.demo_guard import NonDemoTargetError
@@ -98,6 +99,39 @@ def export_actas(
     run = run_simulation(resolved, days, resolved.meta.default_seed)
     manifest = export_confirmed_executions(run, out, FORMATS_BY_CHOICE[export_format])
     typer.echo(f"Ejecuciones confirmadas ({days} días) en {out}. Manifiesto: {manifest}")
+
+
+@app.command("export-backtest")
+def export_backtest(
+    scenario: Annotated[
+        str,
+        typer.Option(help="Nombre del escenario (scenarios/<nombre>.yaml) o ruta a un archivo."),
+    ] = DEFAULT_SCENARIO,
+    days: Annotated[
+        int,
+        typer.Option(help="Días a simular.", min=MIN_DAYS),
+    ] = DEFAULT_DAYS,
+    seed: Annotated[
+        int | None,
+        typer.Option(help="Semilla. Por defecto, la del escenario."),
+    ] = None,
+    out: Annotated[
+        Path,
+        typer.Option(help="Carpeta donde se escriben las ventanas del backtest."),
+    ] = DEFAULT_OUTPUT,
+    export_format: Annotated[
+        ExportChoice,
+        typer.Option("--format", help="Formato de los archivos: csv, parquet o both."),
+    ] = ExportChoice.BOTH,
+) -> None:
+    """Exporta ventanas históricas para el backtest de la IA, en dos conjuntos separados."""
+    resolved = _resolve_scenario(scenario, seed)
+    run = run_simulation(resolved, days, resolved.meta.default_seed)
+    inputs, targets = export_backtest_windows(run, out, FORMATS_BY_CHOICE[export_format])
+    typer.echo(
+        f"Ventanas del backtest en {out}. Entradas observadas: {inputs}. "
+        f"Objetivos con verdad: {targets}"
+    )
 
 
 @app.command()
