@@ -6,3 +6,6 @@ export const STATE_REFRESH_MS = 2000;
 export const MAX_EVENTS_SHOWN = 50;
 export const PERCENT = 100;
 export const LEVEL_DECIMALS = 2;
+export const CONTROLS_PATH = "/api/tablero/controles";
+export const SPEED_FACTORS = [1, 10, 60] as const;
+export const DEFAULT_SPEED = 1;

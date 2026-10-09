@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { fetchState } from "../api/client";
-import { API_EVENTS_PATH, STATE_REFRESH_MS } from "../config";
 import { DROPPED_EVENT, SIMULATION_EVENT_KINDS, type SimulationEventView, type StateView } from "../api/types";
+import { API_EVENTS_PATH, STATE_REFRESH_MS } from "../config";
 import { appendEvent, parseEventFrame } from "../state/events";
 
 export interface SimulationView {
@@ -9,6 +9,7 @@ export interface SimulationView {
   events: SimulationEventView[];
   connected: boolean;
   stateError: boolean;
+  refresh: () => void;
 }
 
 /** Keeps the dashboard in sync: the state is polled, and the events arrive by SSE. */
@@ -18,22 +19,19 @@ export function useSimulation(): SimulationView {
   const [connected, setConnected] = useState(false);
   const [stateError, setStateError] = useState(false);
 
+  const refresh = useCallback((): void => {
+    fetchState()
+      .then((next) => {
+        setState(next);
+        setStateError(false);
+      })
+      .catch(() => {
+        setStateError(true);
+      });
+  }, []);
+
   useEffect(() => {
     let active = true;
-    const refresh = (): void => {
-      fetchState()
-        .then((next) => {
-          if (active) {
-            setState(next);
-            setStateError(false);
-          }
-        })
-        .catch(() => {
-          if (active) {
-            setStateError(true);
-          }
-        });
-    };
     refresh();
     const timer = window.setInterval(refresh, STATE_REFRESH_MS);
 
@@ -63,7 +61,7 @@ export function useSimulation(): SimulationView {
       window.clearInterval(timer);
       source.close();
     };
-  }, []);
+  }, [refresh]);
 
-  return { state, events, connected, stateError };
+  return { state, events, connected, stateError, refresh };
 }

@@ -72,3 +72,7 @@ class DashboardSettings(BaseSettings):
         default=DEFAULT_DASHBOARD_STATIC_DIR,
         description="Built dashboard (dashboard/dist). Served by the API when it exists.",
     )
+
+
+SIMULATION_SPEED_FACTORS = (1, 10, 60)
+DEFAULT_SPEED_FACTOR = 1

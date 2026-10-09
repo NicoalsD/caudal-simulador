@@ -27,7 +27,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}"],
+    // The named constants of the dashboard live here, so this file is the one place with numbers.
+    files: ["src/config.ts", "**/*.test.{ts,tsx}"],
     rules: {
       "no-magic-numbers": "off",
     },

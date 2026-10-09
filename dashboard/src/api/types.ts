@@ -15,6 +15,8 @@ export interface StateView {
   sensor_level_m: number | null;
   gauge_min_m: number | null;
   gauge_max_m: number | null;
+  paused: boolean;
+  speed_factor: number;
   valves: ValveView[];
 }
 
@@ -32,4 +34,21 @@ export interface SimulationEventView {
   kind: string;
   subject_id: string;
   detail: string;
+}
+
+/** Manual conditions the dashboard can inject. There is no valve action on purpose. */
+export type ControlAction =
+  | "LEAK"
+  | "HEAVY_RAIN"
+  | "SENSOR_STUCK"
+  | "SENSOR_SILENT"
+  | "NETWORK_DOWN"
+  | "NETWORK_UP"
+  | "PAUSE"
+  | "RESUME"
+  | "SET_SPEED";
+
+export interface ControlBody {
+  action: ControlAction;
+  factor?: number;
 }

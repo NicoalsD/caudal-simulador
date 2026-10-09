@@ -1,3 +1,4 @@
+import { ControlPanel } from "./components/ControlPanel";
 import { EventLog } from "./components/EventLog";
 import { SensorPanel } from "./components/SensorPanel";
 import { SimulatedBanner } from "./components/SimulatedBanner";
@@ -5,9 +6,10 @@ import { TankGauge } from "./components/TankGauge";
 import { ValveList } from "./components/ValveList";
 import { useSimulation } from "./hooks/useSimulation";
 import { es } from "./i18n/es";
+import { DEFAULT_SPEED } from "./config";
 
 export function App() {
-  const { state, events, connected, stateError } = useSimulation();
+  const { state, events, connected, stateError, refresh } = useSimulation();
 
   return (
     <div className="page">
@@ -35,6 +37,14 @@ export function App() {
         <section className="card" aria-labelledby="sensor-title">
           <h2 id="sensor-title">{es.sensorTitle}</h2>
           <SensorPanel reading={state?.sensor_level_m ?? null} />
+        </section>
+        <section className="card" aria-labelledby="controls-title">
+          <h2 id="controls-title">{es.controlsTitle}</h2>
+          <ControlPanel
+            paused={state?.paused ?? false}
+            speedFactor={state?.speed_factor ?? DEFAULT_SPEED}
+            onApplied={refresh}
+          />
         </section>
         <section className="card wide" aria-labelledby="events-title">
           <h2 id="events-title">{es.eventsTitle}</h2>

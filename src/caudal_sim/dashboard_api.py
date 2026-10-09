@@ -14,11 +14,12 @@ from typing import Annotated, Literal
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from caudal_sim import __version__
+from caudal_sim.config import SIMULATION_SPEED_FACTORS
 from caudal_sim.dashboard_events import MAX_STREAM_EVENTS, SSE_CONTENT_TYPE, stream_frames
-from caudal_sim.dashboard_session import DashboardSession
+from caudal_sim.dashboard_session import ControlAction, ControlRequest, DashboardSession
 
 API_TITLE = "API del tablero del simulador CAUDAL"
 API_DESCRIPTION = (
@@ -27,7 +28,10 @@ API_DESCRIPTION = (
 )
 SIMULATED_NOTICE = "Datos simulados"
 STATE_PATH = "/api/tablero/estado"
+HTTP_ACCEPTED = 202
+HTTP_UNPROCESSABLE = 422
 EVENTS_PATH = "/api/tablero/eventos"
+CONTROLS_PATH = "/api/tablero/controles"
 NO_CACHE_HEADER = {"Cache-Control": "no-cache"}
 TAG_DASHBOARD = "Tablero"
 
@@ -38,6 +42,41 @@ class ValveOut(BaseModel):
     id: str = Field(description="Identificador de la válvula simulada.")
     label: str = Field(description="Nombre de la válvula para el tablero.")
     status: str = Field(description="Estado de la válvula: CLOSED, OPENING, OPEN, CLOSING o FAULT.")
+
+
+class ControlIn(BaseModel):
+    """A manual condition for the simulation. The dashboard cannot open or close valves."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: ControlAction = Field(
+        description=(
+            "Condición a inyectar: LEAK (fuga en un sector), HEAVY_RAIN (lluvia fuerte), "
+            "SENSOR_STUCK (sensor pegado), SENSOR_SILENT (sensor sin señal), NETWORK_DOWN "
+            "(se corta la red), NETWORK_UP (vuelve la red), PAUSE, RESUME o SET_SPEED. "
+            "Las válvulas no se mueven desde el tablero: solo la Junta aprueba turnos."
+        ),
+    )
+    factor: int | None = Field(
+        default=None,
+        description="Solo con SET_SPEED: velocidad del reloj, 1, 10 o 60.",
+    )
+
+    @model_validator(mode="after")
+    def _factor_matches_action(self) -> ControlIn:
+        if self.action is ControlAction.SET_SPEED and self.factor not in SIMULATION_SPEED_FACTORS:
+            raise ValueError("con SET_SPEED, factor debe ser 1, 10 o 60")
+        if self.action is not ControlAction.SET_SPEED and self.factor is not None:
+            raise ValueError("factor solo se usa con SET_SPEED")
+        return self
+
+
+class ControlOut(BaseModel):
+    """A control that the simulation will apply at its next step."""
+
+    action: ControlAction = Field(description="Condición aceptada.")
+    factor: int | None = Field(default=None, description="Velocidad, si la condición la usa.")
+    status: str = Field(default="QUEUED", description="Estado: QUEUED, en cola para aplicarse.")
 
 
 class StateOut(BaseModel):
@@ -63,6 +102,8 @@ class StateOut(BaseModel):
     gauge_max_m: float | None = Field(
         default=None, description="Máximo de la regla pintada del tanque, en metros."
     )
+    paused: bool = Field(default=False, description="Si el reloj de la simulación está en pausa.")
+    speed_factor: int = Field(default=1, description="Velocidad del reloj: 1, 10 o 60.")
     valves: list[ValveOut] = Field(description="Válvulas de la simulación y su estado.")
 
 
@@ -98,6 +139,8 @@ def create_dashboard_app(session: DashboardSession, static_dir: Path | None = No
             sensor_level_m=snapshot.sensor_level_m,
             gauge_min_m=snapshot.gauge_min_m,
             gauge_max_m=snapshot.gauge_max_m,
+            paused=snapshot.paused,
+            speed_factor=snapshot.speed_factor,
             valves=[
                 ValveOut(id=valve.valve_id, label=valve.label, status=valve.status)
                 for valve in snapshot.valves
@@ -130,6 +173,26 @@ def create_dashboard_app(session: DashboardSession, static_dir: Path | None = No
             max_events=max_events,
         )
         return StreamingResponse(frames, media_type=SSE_CONTENT_TYPE, headers=NO_CACHE_HEADER)
+
+    @app.post(
+        CONTROLS_PATH,
+        response_model=ControlOut,
+        status_code=HTTP_ACCEPTED,
+        tags=[TAG_DASHBOARD],
+        summary="Inyecta una condición manual en la simulación",
+        description=(
+            "Pone en cola una condición de campo (fuga, lluvia, sensor pegado o sin señal, red, "
+            "pausa o velocidad). La simulación la aplica en su siguiente paso. No abre ni cierra "
+            "válvulas: los turnos los aprueba la Junta."
+        ),
+        responses={
+            HTTP_ACCEPTED: {"description": "Condición aceptada y en cola."},
+            HTTP_UNPROCESSABLE: {"description": "Condición o velocidad no válidas."},
+        },
+    )
+    def request_control(control: ControlIn) -> ControlOut:
+        session.request_control(ControlRequest(action=control.action, factor=control.factor))
+        return ControlOut(action=control.action, factor=control.factor)
 
     if static_dir is not None and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="tablero")

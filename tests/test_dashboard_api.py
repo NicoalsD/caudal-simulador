@@ -32,6 +32,8 @@ ALLOWED_STATE_KEYS = {
     "sensor_level_m",
     "gauge_min_m",
     "gauge_max_m",
+    "paused",
+    "speed_factor",
     "valves",
 }
 

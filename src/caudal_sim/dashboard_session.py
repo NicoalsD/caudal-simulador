@@ -8,10 +8,43 @@ and no personal data.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, replace
 from datetime import datetime
+from enum import StrEnum
 
+from caudal_sim.config import DEFAULT_SPEED_FACTOR, SIMULATION_SPEED_FACTORS
 from caudal_sim.event_bus import SimulationEvent, SimulationEventBus, SimulationEventKind
+
+
+class ControlAction(StrEnum):
+    """Field conditions that the dashboard can inject. Valves are not on the list on purpose:
+    no valve moves without a shift approved by the Junta."""
+
+    LEAK = "LEAK"
+    HEAVY_RAIN = "HEAVY_RAIN"
+    SENSOR_STUCK = "SENSOR_STUCK"
+    SENSOR_SILENT = "SENSOR_SILENT"
+    NETWORK_DOWN = "NETWORK_DOWN"
+    NETWORK_UP = "NETWORK_UP"
+    PAUSE = "PAUSE"
+    RESUME = "RESUME"
+    SET_SPEED = "SET_SPEED"
+
+
+@dataclass(frozen=True)
+class ControlRequest:
+    """One manual control. `factor` is only used by `SET_SPEED`."""
+
+    action: ControlAction
+    factor: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.action is ControlAction.SET_SPEED:
+            if self.factor not in SIMULATION_SPEED_FACTORS:
+                raise ValueError("la velocidad debe ser una de las opciones del tablero")
+        elif self.factor is not None:
+            raise ValueError("solo la velocidad admite un factor")
 
 
 @dataclass(frozen=True)
@@ -33,6 +66,8 @@ class DashboardSnapshot:
     sensor_level_m: float | None
     gauge_min_m: float | None
     gauge_max_m: float | None
+    paused: bool
+    speed_factor: int
     valves: tuple[ValveView, ...]
 
 
@@ -51,6 +86,9 @@ class DashboardSession:
         self._gauge_min_m: float | None = None
         self._gauge_max_m: float | None = None
         self._valves: dict[str, ValveView] = {}
+        self._controls: deque[ControlRequest] = deque()
+        self._paused = False
+        self._speed_factor = DEFAULT_SPEED_FACTOR
         self._bus.subscribe(self)
 
     @property
@@ -75,6 +113,32 @@ class DashboardSession:
         self._tank_level_m = tank_level_m
         self._sensor_level_m = sensor_level_m
 
+    def request_control(self, request: ControlRequest) -> None:
+        """Queues a manual control for the simulation loop. Pause and speed also apply at once."""
+        if request.action is ControlAction.PAUSE:
+            self._paused = True
+        elif request.action is ControlAction.RESUME:
+            self._paused = False
+        elif request.action is ControlAction.SET_SPEED and request.factor is not None:
+            self._speed_factor = request.factor
+        self._controls.append(request)
+
+    def drain_controls(self) -> tuple[ControlRequest, ...]:
+        """Takes the queued controls, in the order they were requested. Each one is taken once."""
+        taken = tuple(self._controls)
+        self._controls.clear()
+        return taken
+
+    @property
+    def paused(self) -> bool:
+        """Whether the simulation clock is paused, as the dashboard last requested."""
+        return self._paused
+
+    @property
+    def speed_factor(self) -> int:
+        """Speed of the simulation clock, as the dashboard last requested."""
+        return self._speed_factor
+
     def snapshot(self) -> DashboardSnapshot:
         """Copy of the current state, safe to read while the simulation keeps running."""
         return DashboardSnapshot(
@@ -84,6 +148,8 @@ class DashboardSession:
             sensor_level_m=self._sensor_level_m,
             gauge_min_m=self._gauge_min_m,
             gauge_max_m=self._gauge_max_m,
+            paused=self._paused,
+            speed_factor=self._speed_factor,
             valves=tuple(self._valves.values()),
         )
 
