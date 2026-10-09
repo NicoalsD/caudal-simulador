@@ -1,7 +1,8 @@
 """Simulated valve actuator: moves between the limit switches and reports its state.
 
-The actuator follows the `ValveState` machine. A travel ends when the simulated time reaches
-the travel time of the valve; then the matching limit switch is reached.
+The actuator follows the `ValveState` machine and delegates the motor to an `ActuatorDriver`.
+A travel that ends at the limit switch goes to OPEN or CLOSED. A travel that exceeds the
+maximum travel time stops the motor and goes to FAULT.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Protocol
 
+from caudal_sim.actuator_driver import ActuatorDriver, MotorDirection
 from caudal_sim.valve_state import ClosedState, ValveEvent, ValveState, ValveStatus
 
 TRAVELLING_STATUSES = frozenset({ValveStatus.OPENING, ValveStatus.CLOSING})
@@ -32,15 +34,20 @@ class Actuator(Protocol):
 
 
 class ValveActuator:
-    """Motorized ball valve with two limit switches and a fixed travel time.
+    """Motorized ball valve: the valve logic (abstraction) over a motor driver (implementor).
 
     The valve starts closed. Reversing a travel restarts the travel time.
+
+    @pattern P07 Bridge
     """
 
-    def __init__(self, travel_time: timedelta) -> None:
-        if travel_time <= timedelta(0):
-            raise ValueError("el tiempo de recorrido de la válvula debe ser mayor que cero")
-        self._travel_time = travel_time
+    def __init__(self, driver: ActuatorDriver, max_travel_time: timedelta) -> None:
+        if max_travel_time <= timedelta(0):
+            raise ValueError("el tiempo máximo de maniobra debe ser mayor que cero")
+        if max_travel_time < driver.travel_time:
+            raise ValueError("el tiempo máximo de maniobra no puede ser menor que el recorrido")
+        self._driver = driver
+        self._max_travel_time = max_travel_time
         self._state: ValveState = ClosedState()
         self._travelled = timedelta(0)
 
@@ -60,15 +67,24 @@ class ValveActuator:
         if self.status not in TRAVELLING_STATUSES:
             return
         self._travelled += elapsed
-        if self._travelled < self._travel_time:
-            return
-        if self.status is ValveStatus.OPENING:
-            self._apply(ValveEvent.OPEN_LIMIT_REACHED)
-        else:
-            self._apply(ValveEvent.CLOSED_LIMIT_REACHED)
+        if self._driver.limit_reached_after(self._travelled):
+            if self.status is ValveStatus.OPENING:
+                self._apply(ValveEvent.OPEN_LIMIT_REACHED)
+            else:
+                self._apply(ValveEvent.CLOSED_LIMIT_REACHED)
+        elif self._travelled >= self._max_travel_time:
+            self._apply(ValveEvent.TRAVEL_TIMEOUT)
 
     def _apply(self, event: ValveEvent) -> None:
         previous = self.status
         self._state = self._state.handle(event)
-        if self.status is not previous and self.status in TRAVELLING_STATUSES:
+        if self.status is previous:
+            return
+        if previous in TRAVELLING_STATUSES:
+            self._driver.stop()
+        if self.status in TRAVELLING_STATUSES:
             self._travelled = timedelta(0)
+            direction = (
+                MotorDirection.OPEN if self.status is ValveStatus.OPENING else MotorDirection.CLOSE
+            )
+            self._driver.start(direction)

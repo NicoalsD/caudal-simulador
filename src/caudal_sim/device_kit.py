@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from caudal_sim.actuator_driver import SimulatedMotorDriver
 from caudal_sim.sensors import Sensor, SourceSensor
 from caudal_sim.valve_actuator import Actuator, ValveActuator
 
@@ -49,12 +50,15 @@ class FieldKitFactory(DeviceKitFactory):
         self,
         tank_level: Callable[[datetime], float],
         valve_travel_time: timedelta,
+        valve_max_travel_time: timedelta,
     ) -> None:
         self._tank_level = tank_level
         self._valve_travel_time = valve_travel_time
+        self._valve_max_travel_time = valve_max_travel_time
 
     def create_sensor(self) -> Sensor:
         return SourceSensor(self._tank_level)
 
     def create_actuator(self) -> Actuator:
-        return ValveActuator(self._valve_travel_time)
+        driver = SimulatedMotorDriver(self._valve_travel_time)
+        return ValveActuator(driver, self._valve_max_travel_time)
