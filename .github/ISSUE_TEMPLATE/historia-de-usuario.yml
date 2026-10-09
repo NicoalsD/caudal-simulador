@@ -1,0 +1,37 @@
+name: Historia de usuario
+description: Una funcionalidad vista desde un actor de CAUDAL.
+title: "HU-XX: "
+labels: ["tipo:feat"]
+body:
+  - type: input
+    id: actor
+    attributes:
+      label: Actor
+      description: Junta, fontanero, familias, equipo del proyecto o entidad de apoyo.
+    validations:
+      required: true
+  - type: textarea
+    id: historia
+    attributes:
+      label: Historia
+      value: |
+        Como <actor>
+        quiero <acción>
+        para <beneficio>
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación (Gherkin)
+      value: |
+        Dado ...
+        Cuando ...
+        Entonces ...
+    validations:
+      required: true
+  - type: input
+    id: trazabilidad
+    attributes:
+      label: Requisitos relacionados
+      description: Por ejemplo RF-12, RNF-03.

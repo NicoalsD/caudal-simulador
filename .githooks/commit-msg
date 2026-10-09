@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Regla de commits de CAUDAL.
+# Formato: "tipo: descripción" en español, minúscula inicial, máximo 72 caracteres, sin punto final.
+# Prohíbe atribuir commits a una IA (trailers Co-Authored-By de IA o "Generated with").
+export LC_ALL=C.UTF-8
+msg_file="$1"
+subject="$(grep -v '^#' "$msg_file" | sed -n '1p')"
+
+# Los merges y reverts generados por git se aceptan tal cual.
+if [[ "$subject" =~ ^(Merge|Revert\ \") ]]; then exit 0; fi
+
+types='feat|fix|hotfix|docs|test|refactor|style|perf|build|ci|chore|revert'
+if ! printf '%s' "$subject" | grep -Eq "^(${types}): [a-z0-9áéíóúüñ\`]"; then
+  echo "ERROR: el commit debe tener el formato 'tipo: descripción' en minúscula." >&2
+  echo "Tipos válidos: ${types//|/, }" >&2
+  echo "Ejemplo: feat: agrega registro de lecturas del tanque" >&2
+  exit 1
+fi
+if [ "${#subject}" -gt 72 ]; then
+  echo "ERROR: la primera línea tiene ${#subject} caracteres (máximo 72)." >&2
+  exit 1
+fi
+if [[ "$subject" == *. ]]; then
+  echo "ERROR: la primera línea no debe terminar en punto." >&2
+  exit 1
+fi
+if grep -Eiq '^co-authored-by:.*(claude|anthropic|openai|copilot|gpt|gemini)|noreply@anthropic\.com|generated with' "$msg_file"; then
+  echo "ERROR: está prohibido atribuir commits a una IA (Co-Authored-By o 'Generated with')." >&2
+  exit 1
+fi
+exit 0
