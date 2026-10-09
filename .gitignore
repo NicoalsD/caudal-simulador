@@ -1,0 +1,40 @@
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.swp
+
+# Variables de entorno y secretos (nunca se suben)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+keys/
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Salidas del simulador (datasets y verdad de terreno)
+outputs/
+# Tablero (Node / Vite)
+dashboard/node_modules/
+dashboard/dist/
