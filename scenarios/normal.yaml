@@ -1,0 +1,28 @@
+# Escenario normal: operación típica del acueducto veredal de Guaitarilla.
+# Los datos que genera este escenario son SIMULADOS.
+# Todos los parámetros viven aquí; el código no tiene valores de negocio.
+# Los valores marcados "supuesto, verificar" no vienen de medición.
+
+meta:
+  name: normal
+  description: Operación típica con régimen bimodal. Línea base de las pruebas.
+  # Zona horaria del acueducto (Colombia no tiene horario de verano).
+  timezone: America/Bogota
+  # Primer día de la simulación. Fecha fija: nunca se toma la hora del sistema.
+  start_date: 2026-01-01
+  # Siempre true: el escenario produce datos simulados por definición.
+  simulated: true
+  # Semilla por defecto. La misma semilla y el mismo escenario dan los mismos datos.
+  default_seed: 42
+
+tank:
+  # Área de la sección horizontal del tanque, en m². Supuesto, verificar con medición en campo.
+  area_m2: 12.0
+  # Regla pintada del tanque, en metros. Valores de ejemplo de la semilla:
+  # la Junta define el rango real.
+  gauge_min: 0.0
+  gauge_max: 5.0
+  # Paso de precisión de la regla, en metros. Supuesto, verificar con la regla pintada.
+  gauge_step: 0.1
+  # Nivel al inicio de la simulación, en metros. Supuesto, verificar.
+  initial_gauge: 3.4
