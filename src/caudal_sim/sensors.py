@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol
 
 import numpy as np
+
+ONE_DAY = timedelta(days=1)
 
 
 class Sensor(Protocol):
@@ -77,3 +79,23 @@ class StuckSensor:
     def restore(self, state: float | None) -> None:
         """Puts back the frozen value saved in a snapshot."""
         self._frozen = state
+
+
+class DriftingSensor:
+    """Adds a linear drift to the reading of another sensor, from `drift_start` on.
+
+    The offset is `drift_m_per_day` times the days since `drift_start`. It is a pure function
+    of the instant, so the decorator keeps no state.
+
+    @pattern P09 Decorator
+    """
+
+    def __init__(self, inner: Sensor, drift_m_per_day: float, drift_start: datetime) -> None:
+        self._inner = inner
+        self._drift_m_per_day = drift_m_per_day
+        self._drift_start = drift_start
+
+    def read(self, at: datetime) -> float:
+        elapsed = at - self._drift_start
+        days = max(elapsed, timedelta(0)) / ONE_DAY
+        return self._inner.read(at) + self._drift_m_per_day * days
