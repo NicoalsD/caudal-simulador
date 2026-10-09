@@ -110,3 +110,9 @@ readings:
   hours: [6, 17]
   # Desviación típica del error al leer la regla, en metros. Supuesto, verificar en campo.
   noise_sd_m: 0.03
+  # Probabilidad de que una lectura llegue dos veces (duplicado). Supuesto, verificar en la app.
+  duplicate_probability: 0.02
+  # Probabilidad de que una lectura quede sin señal y llegue horas después. Supuesto.
+  no_signal_probability: 0.05
+  # Retraso máximo de una lectura sin señal, en horas (sorteo uniforme de 1 al máximo).
+  max_delay_hours: 12

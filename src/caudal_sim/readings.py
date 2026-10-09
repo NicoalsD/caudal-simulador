@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 
 from caudal_sim.clock import HOURS_PER_DAY
-from caudal_sim.scenario import TankSpec
+from caudal_sim.scenario import ReadingSpec, TankSpec
 
 GRID_EPSILON = 1e-9
 MAX_STEP_DECIMALS = 12
@@ -70,6 +70,81 @@ class GaussianRoundingReadingModel(ReadingErrorModel):
         )
         grid = self._gauge_min + index * self._gauge_step
         return np.asarray(np.round(grid, self._decimals), dtype=np.float64)
+
+
+@dataclass(frozen=True)
+class TransmittedReading:
+    """Lectura tal como llega al sistema: cuándo se observó, cuándo llegó y si es duplicado."""
+
+    reading_id: int
+    observed_hour_index: int
+    sent_hour_index: int
+    gauge_m: float
+    is_duplicate: bool
+    is_delayed: bool
+
+
+class TransmissionModel(ABC):
+    """Interfaz (Strategy): decide cuándo llega cada lectura al sistema.
+
+    Ninguna lectura se pierde: una lectura sin señal llega después, y un duplicado llega dos
+    veces con el mismo `reading_id`.
+
+    @pattern P19 Strategy
+    """
+
+    @abstractmethod
+    def transmit(
+        self, readings: Sequence[Reading], rng: np.random.Generator
+    ) -> tuple[TransmittedReading, ...]:
+        """Devuelve las llegadas de todas las lecturas, en orden de llegada."""
+
+
+class NoSignalDuplicateTransmission(TransmissionModel):
+    """Sin señal (llegada tardía) y duplicados, con probabilidades y retraso máximo.
+
+    Cada lectura consume tres uniformes del flujo, en un orden fijo, para que el resultado
+    dependa solo de la semilla y del escenario.
+
+    @pattern P19 Strategy
+    """
+
+    def __init__(self, spec: ReadingSpec) -> None:
+        self._spec = spec
+
+    def transmit(
+        self, readings: Sequence[Reading], rng: np.random.Generator
+    ) -> tuple[TransmittedReading, ...]:
+        draws = rng.random((len(readings), 2))
+        delays = rng.integers(1, self._spec.max_delay_hours + 1, size=len(readings))
+        arrivals: list[TransmittedReading] = []
+        for position, reading in enumerate(readings):
+            observed = reading.day_index * HOURS_PER_DAY + reading.hour
+            delayed = bool(draws[position, 0] < self._spec.no_signal_probability)
+            sent = observed + int(delays[position]) if delayed else observed
+            duplicated = bool(draws[position, 1] < self._spec.duplicate_probability)
+            base = TransmittedReading(
+                reading_id=reading.reading_id,
+                observed_hour_index=observed,
+                sent_hour_index=sent,
+                gauge_m=reading.gauge_m,
+                is_duplicate=False,
+                is_delayed=delayed,
+            )
+            arrivals.append(base)
+            if duplicated:
+                arrivals.append(
+                    TransmittedReading(
+                        reading_id=base.reading_id,
+                        observed_hour_index=observed,
+                        sent_hour_index=sent,
+                        gauge_m=base.gauge_m,
+                        is_duplicate=True,
+                        is_delayed=delayed,
+                    )
+                )
+        arrivals.sort(key=lambda item: (item.sent_hour_index, item.reading_id, item.is_duplicate))
+        return tuple(arrivals)
 
 
 def take_readings(

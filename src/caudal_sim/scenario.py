@@ -197,6 +197,9 @@ class ReadingSpec(BaseModel):
 
     hours: list[int] = Field(min_length=1, max_length=HOURS_PER_DAY)
     noise_sd_m: float = Field(ge=0)
+    duplicate_probability: float = Field(ge=0, le=1)
+    no_signal_probability: float = Field(ge=0, le=1)
+    max_delay_hours: int = Field(ge=1)
 
     @model_validator(mode="after")
     def _hours_are_sorted_unique_and_in_the_day(self) -> Self:
