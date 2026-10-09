@@ -40,6 +40,12 @@ class Tank:
         """Current tank volume, in m³."""
         return self._volume_m3
 
+    def restore_volume(self, volume_m3: float) -> None:
+        """Puts the tank back at a volume saved earlier (used when restoring a snapshot)."""
+        if not 0 <= volume_m3 <= self._capacity_m3:
+            raise ValueError("el volumen restaurado debe estar entre cero y la capacidad")
+        self._volume_m3 = volume_m3
+
     def step(self, inflow_m3: float, requested_outflow_m3: float) -> TankStep:
         """Advances one hour. The requested outflow may be trimmed if there is not enough water."""
         if inflow_m3 < 0 or requested_outflow_m3 < 0:
