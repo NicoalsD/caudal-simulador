@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -32,6 +33,7 @@ from caudal_sim.config import (
 )
 from caudal_sim.dashboard_api import DashboardServer, create_dashboard_app
 from caudal_sim.dashboard_session import DashboardSession
+from caudal_sim.demo import DemoCheck, DemoDirector
 from caudal_sim.demo_guard import DemoTargetGuard, NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
 from caudal_sim.live import LiveAbortedError, LiveOptions, LiveRunner, LiveWiring, NetworkGate
@@ -56,6 +58,8 @@ EXIT_CONFIG_ERROR = 2
 EXIT_IMPORT_ERROR = 3
 EXIT_LIVE_ERROR = 4
 DEFAULT_LIVE_DAYS = 1
+DEFAULT_DEMO_DAYS = 3
+DEMO_SCENARIO = "presentation"
 DEFAULT_BACKFILL_DAYS = 90
 
 
@@ -139,6 +143,13 @@ def live(  # noqa: PLR0913 - each parameter is one option that Typer reads from 
         int | None,
         typer.Option(help="Semilla. Por defecto, la del escenario."),
     ] = None,
+    start: Annotated[
+        datetime | None,
+        typer.Option(
+            help="Fecha de inicio del reloj simulado (AAAA-MM-DD). La API rechaza lecturas muy "
+            "viejas: usa la fecha siguiente al último historial cargado."
+        ),
+    ] = None,
     max_hours: Annotated[
         int | None,
         typer.Option(help="Detiene la corrida tras estas horas simuladas.", min=MIN_HOURS),
@@ -156,7 +167,65 @@ def live(  # noqa: PLR0913 - each parameter is one option that Typer reads from 
     ] = True,
 ) -> None:
     """Simula el acueducto en tiempo real y envía sus datos al acueducto demo por la API."""
-    resolved = _resolve_scenario(scenario, seed)
+    resolved = _resolve_scenario(scenario, seed, start)
+    _run_session(
+        resolved,
+        days=days,
+        max_hours=max_hours,
+        auto_junta=auto_junta,
+        dashboard=dashboard,
+        demo=False,
+    )
+
+
+@app.command()
+def demo(
+    *,
+    scenario: Annotated[
+        str,
+        typer.Option(help="Escenario con la sección demo. Por defecto, presentation."),
+    ] = DEMO_SCENARIO,
+    days: Annotated[
+        int,
+        typer.Option(help="Días simulados del guion.", min=MIN_DAYS),
+    ] = DEFAULT_DEMO_DAYS,
+    seed: Annotated[
+        int | None,
+        typer.Option(help="Semilla. Por defecto, la del escenario."),
+    ] = None,
+    start: Annotated[
+        datetime | None,
+        typer.Option(help="Fecha de inicio del reloj simulado (AAAA-MM-DD)."),
+    ] = None,
+    dashboard: Annotated[
+        bool,
+        typer.Option("--tablero/--sin-tablero", help="Levanta el tablero junto a la simulación."),
+    ] = True,
+) -> None:
+    """Ejecuta el guion de demostración con los fallos de campo, sobre el acueducto demo."""
+    resolved = _resolve_scenario(scenario, seed, start)
+    if resolved.demo is None:
+        typer.echo(f"Error: el escenario {resolved.meta.name} no tiene la sección demo.", err=True)
+        raise typer.Exit(code=EXIT_SCENARIO_ERROR)
+    _run_session(
+        resolved,
+        days=days,
+        max_hours=None,
+        auto_junta=False,
+        dashboard=dashboard,
+        demo=True,
+    )
+
+
+def _run_session(  # noqa: PLR0913 - the live and demo commands share this wiring
+    resolved: Scenario,
+    *,
+    days: int,
+    max_hours: int | None,
+    auto_junta: bool,
+    dashboard: bool,
+    demo: bool,
+) -> None:
     settings = _settings_or_exit()
     live_settings = _live_settings_or_exit()
     board_settings = _board_settings_or_exit(live_settings, auto_junta)
@@ -196,6 +265,7 @@ def live(  # noqa: PLR0913 - each parameter is one option that Typer reads from 
                 api=api,
                 adapter=adapter,
                 device_id=live_settings.device_id,
+                tank_id=settings.tank_id,
                 sleeper=time.sleep,
                 board=board,
             )
@@ -204,7 +274,12 @@ def live(  # noqa: PLR0913 - each parameter is one option that Typer reads from 
                 max_hours=max_hours,
                 auto_junta=auto_junta,
             )
-            _run_live(wiring, options, session, dashboard)
+            director = (
+                DemoDirector(resolved.demo, wiring, settings.demo_aqueduct_slug)
+                if demo and resolved.demo is not None
+                else None
+            )
+            _run_live(wiring, options, session, dashboard, director)
     if board is not None:
         board.close()
 
@@ -214,6 +289,7 @@ def _run_live(
     options: LiveOptions,
     session: DashboardSession,
     dashboard: bool,
+    director: DemoDirector | None,
 ) -> None:
     server: DashboardServer | None = None
     if dashboard:
@@ -229,7 +305,8 @@ def _run_live(
             "(datos simulados)."
         )
     try:
-        report = LiveRunner(wiring, options).run()
+        before = director.before_hour if director is not None else None
+        report = LiveRunner(wiring, options).run(before_hour=before)
     except LiveAbortedError as error:
         typer.echo(f"Error: {error.message}", err=True)
         raise typer.Exit(code=EXIT_LIVE_ERROR) from error
@@ -248,6 +325,15 @@ def _run_live(
             "Condiciones pedidas en el tablero que este motor todavía no aplica: "
             + ", ".join(report.unsupported_controls)
         )
+    if director is not None:
+        _print_checklist(director.checks())
+
+
+def _print_checklist(checks: tuple[DemoCheck, ...]) -> None:
+    typer.echo("Lista de comprobación del guion:")
+    for check in checks:
+        mark = {True: "[OK]", False: "[FALLA]", None: "[MANUAL]"}[check.passed]
+        typer.echo(f"{mark} {check.step}: {check.expected} Observado: {check.observed}")
 
 
 def _live_settings_or_exit() -> LiveSettings:
@@ -520,11 +606,13 @@ def _run_backfill(
     )
 
 
-def _resolve_scenario(value: str, seed: int | None) -> Scenario:
+def _resolve_scenario(value: str, seed: int | None, start: datetime | None = None) -> Scenario:
     try:
         builder = ScenarioBuilder().from_yaml(_scenario_path(value))
         if seed is not None:
             builder = builder.override("meta.default_seed", seed)
+        if start is not None:
+            builder = builder.override("meta.start_date", start.date().isoformat())
         return builder.build()
     except ScenarioError as error:
         typer.echo(f"Error: {error}", err=True)

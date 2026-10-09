@@ -262,6 +262,29 @@ class DevicesSpec(BaseModel):
     buffer: BufferSpec
 
 
+class DemoSpec(BaseModel):
+    """Values of the demo script (`caudal-sim demo`). Hours count from the start of the run.
+
+    Every value is a scenario parameter, so the demo is reproducible with the same seed.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    gauge_error_hour: int = Field(
+        ge=0, description="Hora en que el fontanero escribe un valor fuera de la regla."
+    )
+    gauge_error_value: float = Field(gt=0, description="Valor erróneo que se escribe, en metros.")
+    muddy_hour: int = Field(ge=0, description="Hora en que se anota agua con barro.")
+    muddy_appearance_code: str = Field(
+        pattern=r"^[A-Z][A-Z_]{0,39}$", description="Código de WATER_APPEARANCE."
+    )
+    muddy_note: str = Field(min_length=1, max_length=500, description="Nota del fontanero.")
+    silent_sensor_hour: int = Field(ge=0, description="Hora en que el sensor pierde la señal.")
+    damage_report_hour_of_day: int = Field(
+        ge=0, le=HOURS_PER_DAY - 1, description="Hora del día en que la familia reporta la fuga."
+    )
+
+
 class Scenario(BaseModel):
     """Complete validated scenario. Immutable once built."""
 
@@ -277,6 +300,7 @@ class Scenario(BaseModel):
     leaks: LeakSpec
     readings: ReadingSpec
     devices: DevicesSpec
+    demo: DemoSpec | None = None
 
     @model_validator(mode="after")
     def _sector_references_are_valid(self) -> Self:

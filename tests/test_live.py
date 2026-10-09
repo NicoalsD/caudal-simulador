@@ -103,6 +103,7 @@ class _Harness:
             api=self.api,
             adapter=self.adapter,
             device_id=DEVICE_ID,
+            tank_id=TANK_ID,
             sleeper=self.sleeper,
             board=self.board,
         )

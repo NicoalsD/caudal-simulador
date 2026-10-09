@@ -20,6 +20,7 @@ PUBLIC_SCHEDULE_PATH = "/api/v1/public/{slug}/schedule"
 READINGS_PATH = "/api/v1/readings"
 PROPOSALS_PATH = "/api/v1/schedule-proposals"
 PENDING_REVIEW_STATUS = "PENDING_REVIEW"
+PUBLIC_DAMAGE_REPORTS_PATH = "/api/v1/public/{slug}/damage-reports"
 AUTHORIZATION_HEADER = "Authorization"
 BEARER_PREFIX = "Bearer "
 JSON_CONTENT_TYPE = "application/json"
@@ -97,6 +98,10 @@ class CaudalApiClient:
     def post_import(self, path: str, body: Mapping[str, Any]) -> Mapping[str, Any]:
         """Sends one import batch. Requires a prior successful `login`."""
         return self._authorized("POST", path, body=body)
+
+    def post_public_report(self, slug: str, body: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Sends a community damage report through the public form. No login is needed."""
+        return self._request("POST", PUBLIC_DAMAGE_REPORTS_PATH.format(slug=slug), body=body)
 
     def post_reading(self, body: Mapping[str, Any]) -> Mapping[str, Any]:
         """Creates one tank reading as the logged-in user. Requires a prior `login`."""

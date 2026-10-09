@@ -117,6 +117,7 @@ class LiveWiring:
     api: CaudalApiClient
     adapter: ApiPayloadAdapter
     device_id: UUID
+    tank_id: UUID
     sleeper: Callable[[float], None]
     board: CaudalApiClient | None = None
 
@@ -164,11 +165,17 @@ class LiveRunner:
             session.register_valve(sector.id, sector.name)
             self._valve_open[sector.id] = False
 
-    def run(self) -> LiveReport:
-        """Plays the run and returns what happened. Stops early only on `LiveAbortedError`."""
+    def run(self, before_hour: Callable[[int], None] | None = None) -> LiveReport:
+        """Plays the run and returns what happened. Stops early only on `LiveAbortedError`.
+
+        `before_hour` runs at the start of each simulated hour, before the controls are applied.
+        The demo script uses it to act at fixed hours.
+        """
         total = self._run.days * HOURS_PER_DAY
         hours = total if self._options.max_hours is None else min(total, self._options.max_hours)
         for hour in range(hours):
+            if before_hour is not None:
+                before_hour(hour)
             self._wait_while_paused()
             self._apply_controls(hour)
             self._pace(hour)
