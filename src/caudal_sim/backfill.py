@@ -44,11 +44,13 @@ class ImportKind(StrEnum):
 
     READINGS = "readings"
     SHIFT_EXECUTIONS = "shift-executions"
+    INCIDENTS = "incidents"
 
 
 IMPORT_PATHS: dict[ImportKind, str] = {
     ImportKind.READINGS: "/api/v1/imports/readings",
     ImportKind.SHIFT_EXECUTIONS: "/api/v1/imports/shift-executions",
+    ImportKind.INCIDENTS: "/api/v1/imports/incidents",
 }
 
 
@@ -125,6 +127,8 @@ def rows_for(
         ]
     if kind is ImportKind.SHIFT_EXECUTIONS:
         return [adapter.shift_execution_row(shift) for shift in run.observed.shift_executions]
+    if kind is ImportKind.INCIDENTS:
+        return [adapter.incident_row(report) for report in run.observed.damage_reports]
     raise ValueError(f"Tipo de importación no soportado: {kind}")
 
 
