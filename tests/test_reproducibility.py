@@ -1,8 +1,8 @@
-"""Pruebas de reproducibilidad de corridas completas.
+"""Full-run reproducibility tests.
 
-Cubre el patrón P01 (Singleton): el reloj único se reconfigura entre corridas del mismo
-proceso sin dejar estado. Las comparaciones son entre corridas, no contra hashes dorados,
-porque un cambio de versión de numpy o de pyarrow no debe romper la prueba.
+Covers pattern P01 (Singleton): the single clock is reconfigured between runs of the same
+process without leaving state. Comparisons are between runs, not against golden hashes,
+because a numpy or pyarrow version change must not break the test.
 """
 
 import hashlib

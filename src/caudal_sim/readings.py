@@ -1,4 +1,4 @@
-"""Lecturas humanas de la regla del tanque: ruido de lectura y redondeo al paso de la regla."""
+"""Human readings of the tank gauge: reading noise and rounding to the gauge step."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ MAX_STEP_DECIMALS = 12
 
 @dataclass(frozen=True)
 class Reading:
-    """Lectura de la regla: un número en metros, con su día y su hora en la simulación."""
+    """Gauge reading: a number in meters, with its day and hour in the simulation."""
 
     reading_id: int
     day_index: int
@@ -28,7 +28,7 @@ class Reading:
 
 
 class ReadingErrorModel(ABC):
-    """Interfaz (Strategy): convierte el nivel real en el número que anota el fontanero.
+    """Interface (Strategy): turns the true level into the number the operator writes.
 
     @pattern P19 Strategy
     """
@@ -37,15 +37,15 @@ class ReadingErrorModel(ABC):
     def read(
         self, true_levels_m: npt.NDArray[np.float64], rng: np.random.Generator
     ) -> npt.NDArray[np.float64]:
-        """Devuelve la lectura de cada nivel real."""
+        """Returns the reading of each true level."""
 
 
 class GaussianRoundingReadingModel(ReadingErrorModel):
-    """Error normal de lectura, acotado a la regla y redondeado a su paso de precisión.
+    """Normal reading error, bounded to the gauge and rounded to its precision step.
 
-    Orden: ruido, recorte a [gauge_min, gauge_max], redondeo a la rejilla
-    `gauge_min + k * gauge_step` y, por último, los decimales del paso. La lectura nunca cae
-    fuera de la regla ni fuera de la rejilla.
+    Order: noise, clipping to [gauge_min, gauge_max], rounding to the grid
+    `gauge_min + k * gauge_step` and, last, the decimals of the step. The reading never falls
+    outside the gauge or outside the grid.
 
     @pattern P19 Strategy
     """
@@ -74,7 +74,7 @@ class GaussianRoundingReadingModel(ReadingErrorModel):
 
 @dataclass(frozen=True)
 class TransmittedReading:
-    """Lectura tal como llega al sistema: cuándo se observó, cuándo llegó y si es duplicado."""
+    """Reading as it reaches the system: observed time, arrival time and duplicate flag."""
 
     reading_id: int
     observed_hour_index: int
@@ -85,10 +85,10 @@ class TransmittedReading:
 
 
 class TransmissionModel(ABC):
-    """Interfaz (Strategy): decide cuándo llega cada lectura al sistema.
+    """Interface (Strategy): decides when each reading reaches the system.
 
-    Ninguna lectura se pierde: una lectura sin señal llega después, y un duplicado llega dos
-    veces con el mismo `reading_id`.
+    No reading is lost: a reading without signal arrives later, and a duplicate arrives
+    twice with the same `reading_id`.
 
     @pattern P19 Strategy
     """
@@ -97,14 +97,14 @@ class TransmissionModel(ABC):
     def transmit(
         self, readings: Sequence[Reading], rng: np.random.Generator
     ) -> tuple[TransmittedReading, ...]:
-        """Devuelve las llegadas de todas las lecturas, en orden de llegada."""
+        """Returns the arrivals of all readings, in arrival order."""
 
 
 class NoSignalDuplicateTransmission(TransmissionModel):
-    """Sin señal (llegada tardía) y duplicados, con probabilidades y retraso máximo.
+    """No signal (late arrival) and duplicates, with probabilities and maximum delay.
 
-    Cada lectura consume tres uniformes del flujo, en un orden fijo, para que el resultado
-    dependa solo de la semilla y del escenario.
+    Each reading consumes three uniforms from the stream, in a fixed order, so the result
+    depends only on the seed and the scenario.
 
     @pattern P19 Strategy
     """
@@ -154,7 +154,7 @@ def take_readings(
     model: ReadingErrorModel,
     rng: np.random.Generator,
 ) -> tuple[Reading, ...]:
-    """Lecturas del fontanero: en cada día, a las horas indicadas, con el modelo de error."""
+    """Operator readings: each day, at the given hours, through the error model."""
     indices = np.array(
         [day * HOURS_PER_DAY + hour for day in range(days) for hour in reading_hours],
         dtype=np.int64,

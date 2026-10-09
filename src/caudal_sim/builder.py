@@ -1,4 +1,4 @@
-"""Constructor de escenarios: junta los YAML con sobrescrituras y valida al final."""
+"""Scenario builder: merges YAML files with overrides and validates at the end."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from caudal_sim.scenario import Scenario, ScenarioError
 
 
 class ScenarioBuilder:
-    """Arma un escenario paso a paso desde archivos YAML y sobrescrituras.
+    """Builds a scenario step by step from YAML files and overrides.
 
-    Los valores se acumulan sin validar. La validación de Pydantic ocurre una sola vez,
-    en `build()`, que devuelve un `Scenario` inmutable o lanza `ScenarioError`.
+    Values accumulate without validation. Pydantic validation happens only once,
+    in `build()`, which returns an immutable `Scenario` or raises `ScenarioError`.
 
     @pattern P04 Builder
     """
@@ -25,14 +25,14 @@ class ScenarioBuilder:
         self._sources: list[str] = []
 
     def from_yaml(self, path: Path) -> Self:
-        """Mezcla un archivo YAML sobre lo acumulado. Lo que venga después gana."""
+        """Merges a YAML file over what has been accumulated. Later values win."""
         raw = _read_yaml_mapping(path)
         self._data = _deep_merge(self._data, raw)
         self._sources.append(str(path))
         return self
 
     def override(self, dotted_key: str, value: object) -> Self:
-        """Reemplaza un valor por su ruta con puntos, por ejemplo `meta.default_seed`."""
+        """Replaces a value by its dotted path, for example `meta.default_seed`."""
         keys = dotted_key.split(".")
         node: dict[str, Any] = self._data
         for key in keys[:-1]:
@@ -44,7 +44,7 @@ class ScenarioBuilder:
         return self
 
     def build(self) -> Scenario:
-        """Valida lo acumulado y devuelve el escenario. Falla con ScenarioError."""
+        """Validates the accumulated data and returns the scenario. Fails with ScenarioError."""
         origen = ", ".join(self._sources) or "sin archivo"
         try:
             return Scenario.model_validate(self._data)
@@ -57,7 +57,7 @@ class ScenarioBuilder:
 
 
 def load_scenario(path: Path) -> Scenario:
-    """Atajo para cargar un único escenario YAML validado."""
+    """Shortcut to load a single validated YAML scenario."""
     return ScenarioBuilder().from_yaml(path).build()
 
 

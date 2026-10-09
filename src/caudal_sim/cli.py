@@ -1,4 +1,4 @@
-"""Interfaz de línea de comandos del simulador de CAUDAL (textos en español)."""
+"""Command-line interface of the CAUDAL simulator (user-facing texts in Spanish)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ EXIT_SCENARIO_ERROR = 1
 
 
 class ExportChoice(StrEnum):
-    """Formatos de salida que ofrece la CLI."""
+    """Output formats offered by the CLI."""
 
     CSV = "csv"
     PARQUET = "parquet"

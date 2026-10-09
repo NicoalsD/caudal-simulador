@@ -1,4 +1,4 @@
-"""Pruebas del comando `generate` de la CLI."""
+"""Tests of the `generate` CLI command."""
 
 import json
 from pathlib import Path

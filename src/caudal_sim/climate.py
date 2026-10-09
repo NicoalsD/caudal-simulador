@@ -1,4 +1,4 @@
-"""Clima del simulador: días húmedos y secos por mes."""
+"""Climate of the simulator: wet and dry days per month."""
 
 from __future__ import annotations
 
@@ -13,18 +13,18 @@ from caudal_sim.scenario import MONTHS_PER_YEAR, MonthClimate
 
 
 class WetDayModel(ABC):
-    """Interfaz (Strategy): decide qué días llueve dentro de un periodo.
+    """Interface (Strategy): decides which days rain within a period.
 
     @pattern P19 Strategy
     """
 
     @abstractmethod
     def wet_days(self, start: date, days: int, rng: np.random.Generator) -> npt.NDArray[np.bool_]:
-        """Devuelve un valor por día: True si el día es húmedo."""
+        """Returns one value per day: True if the day is wet."""
 
 
 class RainAmountModel(ABC):
-    """Interfaz (Strategy): cantidad de lluvia de cada día, en milímetros.
+    """Interface (Strategy): amount of rain of each day, in millimeters.
 
     @pattern P19 Strategy
     """
@@ -33,14 +33,14 @@ class RainAmountModel(ABC):
     def amounts_mm(
         self, wet: npt.NDArray[np.bool_], start: date, rng: np.random.Generator
     ) -> npt.NDArray[np.float64]:
-        """Devuelve los milímetros de cada día. Los días secos valen cero."""
+        """Returns the millimeters of each day. Dry days are zero."""
 
 
 class MonthlyMarkovClimate(WetDayModel):
-    """Cadena de Markov de dos estados (seco y húmedo) con probabilidades por mes.
+    """Two-state Markov chain (dry and wet) with probabilities per month.
 
-    Cada día usa una única uniforme del flujo aleatorio. Así, el resultado depende solo de
-    la semilla y del escenario, no del orden en que se consultan los días.
+    Each day uses a single uniform from the random stream. Thus the result depends only on
+    the seed and the scenario, not on the order in which days are queried.
 
     @pattern P19 Strategy
     """
@@ -65,10 +65,10 @@ class MonthlyMarkovClimate(WetDayModel):
 
 
 class GammaRainfall(RainAmountModel):
-    """Lluvia de los días húmedos con distribución gamma, forma y escala por mes.
+    """Rain on wet days with a gamma distribution, shape and scale per month.
 
-    Se sortea un monto para todos los días y después se enmascara con los días secos.
-    Así, el flujo aleatorio no depende de qué días son húmedos.
+    One amount is drawn for every day and then masked with the dry days.
+    Thus the random stream does not depend on which days are wet.
 
     @pattern P19 Strategy
     """

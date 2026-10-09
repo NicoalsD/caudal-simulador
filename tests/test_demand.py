@@ -1,4 +1,4 @@
-"""Pruebas de la demanda horaria por sector."""
+"""Tests of the hourly demand per sector."""
 
 from pathlib import Path
 

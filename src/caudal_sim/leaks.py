@@ -1,4 +1,4 @@
-"""Fugas: llegadas por proceso de Poisson, reparación y reporte de la comunidad."""
+"""Leaks: Poisson arrivals, repair and community reports."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ DAYS_PER_MONTH = 30
 
 @dataclass(frozen=True)
 class Leak:
-    """Una fuga: empieza un día, se repara al inicio de `repair_day` y puede ser reportada."""
+    """A leak: starts one day, is repaired at the start of `repair_day`, and may be reported."""
 
     leak_id: int
     start_day: int
@@ -26,18 +26,18 @@ class Leak:
 
 @dataclass(frozen=True)
 class LeakRun:
-    """Fugas del periodo y su caudal de salida por hora (m³ por hora)."""
+    """Leaks of the period and their hourly outflow (m³ per hour)."""
 
     leaks: tuple[Leak, ...]
     outflow_m3_per_hour: npt.NDArray[np.float64]
 
 
 class LeakProcess:
-    """Fugas de llegada Poisson: la cantidad de fugas por día sale de la tasa mensual.
+    """Poisson-arrival leaks: the number of leaks per day comes from the monthly rate.
 
-    La cantidad de fugas por día, la duración y el día del reporte salen de un único flujo
-    aleatorio y en un orden fijo. Por eso el mismo escenario y la misma semilla dan siempre
-    las mismas fugas.
+    The number of leaks per day, their duration and the report day come from a single
+    random stream in a fixed order. So the same scenario and seed always give the same
+    leaks.
     """
 
     def __init__(self, spec: LeakSpec) -> None:
@@ -52,8 +52,8 @@ class LeakProcess:
         repair_days = rng.integers(
             self._spec.repair_days_min, self._spec.repair_days_max + 1, size=count
         )
-        # Días hasta el reporte (geométrica desde el día de inicio). Si pasa de la reparación,
-        # la fuga se repara sin reportarse.
+        # Days until the report (geometric from the start day). If it exceeds the repair,
+        # the leak is repaired without being reported.
         delays = rng.geometric(self._spec.report_probability_per_day, size=count) - 1
 
         leaks: list[Leak] = []

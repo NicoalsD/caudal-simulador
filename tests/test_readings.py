@@ -1,4 +1,4 @@
-"""Pruebas de las lecturas humanas: límites de la regla, redondeo, ruido y reproducibilidad."""
+"""Tests of human readings: gauge limits, rounding, noise and reproducibility."""
 
 from pathlib import Path
 

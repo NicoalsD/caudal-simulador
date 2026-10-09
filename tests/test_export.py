@@ -1,4 +1,4 @@
-"""Pruebas de exportación: archivos, manifiesto con hashes y reproducibilidad de bytes."""
+"""Export tests: files, manifest with hashes and byte-level reproducibility."""
 
 import hashlib
 import json

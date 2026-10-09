@@ -1,4 +1,4 @@
-"""Caudal de la fuente: caudal base más respuesta a la lluvia con retardo."""
+"""Source flow: base flow plus rain response with lag."""
 
 from __future__ import annotations
 
@@ -15,29 +15,29 @@ from caudal_sim.scenario import SourceSpec
 
 @dataclass(frozen=True)
 class SourceSeries:
-    """Caudal horario de la fuente y la bandera de agua con barro."""
+    """Hourly source flow and the muddy-water flag."""
 
     flow_m3_per_hour: npt.NDArray[np.float64]
     muddy_water: npt.NDArray[np.bool_]
 
 
 class InflowModel(ABC):
-    """Interfaz (Strategy): caudal de la fuente a partir de la lluvia diaria.
+    """Interface (Strategy): source flow from daily rain.
 
     @pattern P19 Strategy
     """
 
     @abstractmethod
     def simulate(self, daily_rain_mm: npt.NDArray[np.float64]) -> SourceSeries:
-        """Devuelve el caudal y la turbiedad de cada hora del periodo."""
+        """Returns the flow and turbidity of each hour of the period."""
 
 
 class LaggedRainSource(InflowModel):
-    """Caudal base más una respuesta exponencial a la lluvia, con retardo.
+    """Base flow plus an exponential response to rain, with lag.
 
-    La lluvia diaria se reparte en partes iguales entre las horas del día (supuesto).
-    Cada hora, la respuesta acumulada decae con la constante `response_lag_hours`.
-    Un día con lluvia igual o mayor al umbral deja el agua con barro durante varias horas.
+    Daily rain is spread equally across the hours of the day (assumption, verify).
+    Each hour, the accumulated response decays with the constant `response_lag_hours`.
+    A day with rain equal to or above the threshold leaves the water muddy for several hours.
 
     @pattern P19 Strategy
     """

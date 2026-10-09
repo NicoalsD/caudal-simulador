@@ -1,6 +1,6 @@
-"""Simulador de datos de CAUDAL para el acueducto veredal de Guaitarilla.
+"""Data simulator for the CAUDAL rural water system of Guaitarilla.
 
-Todos los datos que produce este paquete son simulados.
+All data produced by this package is simulated.
 """
 
 __version__ = "0.1.0"

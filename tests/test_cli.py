@@ -1,4 +1,4 @@
-"""Pruebas de humo de la interfaz de línea de comandos."""
+"""Smoke tests of the command-line interface."""
 
 from typer.testing import CliRunner
 

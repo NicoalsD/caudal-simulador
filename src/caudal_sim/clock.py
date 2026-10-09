@@ -1,4 +1,4 @@
-"""Reloj de la simulación: fuente única de tiempo y de números aleatorios reproducibles."""
+"""Simulation clock: single source of time and reproducible random numbers."""
 
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ HOURS_PER_DAY = 24
 
 
 class SimulationClock:
-    """Reloj único de la simulación y fábrica de flujos aleatorios reproducibles.
+    """Single simulation clock and factory of reproducible random streams.
 
-    Todos los actores leen el tiempo y el azar desde esta instancia. Cada flujo se
-    identifica por nombre: agregar un componente nuevo (por ejemplo, las fugas) no cambia
-    los datos de los demás (por ejemplo, la lluvia).
+    Every actor reads time and randomness from this instance. Each stream is
+    identified by name: adding a new component (for example, leaks) does not change
+    the data of the others (for example, rain).
 
     @pattern P01 Singleton
     """
@@ -35,7 +35,7 @@ class SimulationClock:
         return cls._instance
 
     def configure(self, start: datetime, seed: int) -> None:
-        """Fija el inicio (con zona horaria) y la semilla. Puede llamarse de nuevo al reiniciar."""
+        """Sets the start (with time zone) and the seed. Can be called again to restart."""
         if start.tzinfo is None or start.utcoffset() is None:
             raise ValueError("el inicio de la simulación debe tener zona horaria")
         if seed < 0:
@@ -45,24 +45,24 @@ class SimulationClock:
 
     @property
     def start(self) -> datetime:
-        """Instante de la hora 0 de la simulación."""
+        """Instant of hour 0 of the simulation."""
         if self._start is None:
             raise RuntimeError("el reloj de la simulación no está configurado")
         return self._start
 
     @property
     def seed(self) -> int:
-        """Semilla de la corrida actual."""
+        """Seed of the current run."""
         if self._seed is None:
             raise RuntimeError("el reloj de la simulación no está configurado")
         return self._seed
 
     def timestamp_at(self, hour_index: int) -> datetime:
-        """Instante correspondiente a una hora de la simulación (0 es el inicio)."""
+        """Instant corresponding to a simulation hour (0 is the start)."""
         return self.start + timedelta(hours=hour_index)
 
     def stream(self, name: str) -> np.random.Generator:
-        """Flujo aleatorio con nombre estable: misma semilla y mismo nombre, misma secuencia."""
+        """Named random stream: same seed and same name, same sequence."""
         spawn_key = zlib.crc32(name.encode(RNG_STREAM_NAME_ENCODING))
         sequence = np.random.SeedSequence(entropy=self.seed, spawn_key=(spawn_key,))
         return np.random.Generator(np.random.PCG64(sequence))

@@ -1,4 +1,4 @@
-"""Pruebas de duplicados y lecturas sin señal: ninguna lectura se pierde y llega a tiempo."""
+"""Tests of duplicates and readings without signal: no reading is lost and each arrives in time."""
 
 from pathlib import Path
 

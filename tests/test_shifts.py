@@ -1,4 +1,4 @@
-"""Pruebas de cumplimiento de turnos a partir del horario publicado."""
+"""Tests of shift compliance from the published schedule."""
 
 from pathlib import Path
 
@@ -36,7 +36,7 @@ def _schedule(p_completed: float, p_partial: float, p_not_executed: float) -> Sc
 
 
 def _single_turn_schedule(p_completed: float, p_partial: float) -> ScheduleSpec:
-    """Horario con un solo turno (el primero del escenario), para aislar su ventana."""
+    """Schedule with a single shift (the scenario's first one), to isolate its window."""
     schedule = _schedule(p_completed, p_partial, 1.0 - p_completed - p_partial)
     return schedule.model_copy(update={"turns": [schedule.turns[0]]})
 

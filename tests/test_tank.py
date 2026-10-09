@@ -1,4 +1,4 @@
-"""Pruebas del balance de masa del tanque (propiedades con Hypothesis y casos concretos)."""
+"""Tank mass balance tests (Hypothesis properties and concrete cases)."""
 
 from pathlib import Path
 
@@ -84,12 +84,12 @@ def test_mass_balance_holds_and_volume_stays_within_bounds(
         before = tank.volume_m3
         result = tank.step(inflow_m3=inflow, requested_outflow_m3=requested)
 
-        # Entradas = salidas + rebose + cambio de volumen (dentro de la tolerancia numérica).
+        # Inflow = outflow + overflow + volume change (within numerical tolerance).
         balance = inflow - result.delivered_m3 - result.overflow_m3 - (result.volume_m3 - before)
         assert abs(balance) <= MASS_TOLERANCE_M3
-        # El agua entregada nunca supera la pedida ni la disponible.
+        # Delivered water never exceeds the requested or the available amount.
         assert 0.0 <= result.delivered_m3 <= requested + MASS_TOLERANCE_M3
         assert result.overflow_m3 >= 0.0
-        # El volumen se queda dentro de [0, capacidad], y el nivel dentro de la regla.
+        # Volume stays within [0, capacity], and the level within the gauge rule.
         assert -MASS_TOLERANCE_M3 <= result.volume_m3 <= tank.capacity_m3 + MASS_TOLERANCE_M3
         assert -LEVEL_TOLERANCE_M <= result.level_m <= gauge_max + LEVEL_TOLERANCE_M

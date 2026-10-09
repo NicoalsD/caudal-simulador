@@ -1,4 +1,4 @@
-"""Exportación de corridas a CSV y Parquet, con un manifiesto de hashes y de semilla."""
+"""Export of runs to CSV and Parquet, with a manifest of hashes and seed."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ HASH_CHUNK_BYTES = 1 << 20
 
 
 def export_run(run: SimulationRun, out_dir: Path, formats: tuple[Format, ...] = FORMATS) -> Path:
-    """Escribe observed/ y truth/ en los formatos pedidos y el manifiesto. Devuelve su ruta."""
+    """Writes observed/ and truth/ in the requested formats plus the manifest. Returns its path."""
     out_dir.mkdir(parents=True, exist_ok=True)
     tables = _tables(run)
     written: dict[str, dict[str, Any]] = {}

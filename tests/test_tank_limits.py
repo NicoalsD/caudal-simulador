@@ -1,4 +1,4 @@
-"""Pruebas de los límites del tanque en corridas completas: regla, rebose y vaciado."""
+"""Tank limit tests on full runs: gauge rule, overflow and emptying."""
 
 from pathlib import Path
 

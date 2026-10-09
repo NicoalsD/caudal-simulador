@@ -1,4 +1,4 @@
-"""Demanda horaria por sector: hogares, personas, dotación y perfil del día."""
+"""Hourly demand per sector: households, people, per-capita allowance and daily profile."""
 
 from __future__ import annotations
 
@@ -13,14 +13,14 @@ LITERS_PER_CUBIC_METER = 1000.0
 
 
 class SectorDemandModel:
-    """Demanda que pide cada sector en cada hora, en m³.
+    """Demand requested by each sector in each hour, in m³.
 
-    Demanda = personas del sector por dotación diaria por fracción del perfil horario.
-    Las personas se sortean una vez por sector, en el orden del escenario, y se mantienen
-    durante toda la simulación. Este modelo no decide si el agua sale: eso depende de la
-    válvula abierta del sector.
+    Demand = sector people times daily allowance times hourly profile fraction.
+    People are drawn once per sector, in scenario order, and kept for the whole
+    simulation. This model does not decide whether water flows: that depends on the
+    sector's open valve.
 
-    Sin @pattern: es un cálculo directo de la demanda.
+    Without @pattern: it is a direct demand calculation.
     """
 
     def __init__(self, sectors: Sequence[SectorSpec], demand: DemandSpec) -> None:
@@ -30,7 +30,7 @@ class SectorDemandModel:
         self._profile: npt.NDArray[np.float64] = weights / weights.sum()
 
     def residents(self, rng: np.random.Generator) -> dict[str, int]:
-        """Personas por sector: suma del sorteo de personas de cada hogar."""
+        """People per sector: sum of the random draw of people in each household."""
         residents: dict[str, int] = {}
         for sector in self._sectors:
             per_household = rng.integers(
@@ -40,14 +40,14 @@ class SectorDemandModel:
         return residents
 
     def daily_volume_m3(self, residents: int) -> float:
-        """Volumen diario de un sector con esas personas, en m³."""
+        """Daily volume of a sector with those people, in m³."""
         liters = residents * self._demand.liters_per_person_per_day
         return liters / LITERS_PER_CUBIC_METER
 
     def hourly_demand_m3(
         self, days: int, rng: np.random.Generator
     ) -> dict[str, npt.NDArray[np.float64]]:
-        """Demanda horaria de cada sector durante `days` días, en m³ por hora."""
+        """Hourly demand of each sector over `days` days, in m³ per hour."""
         residents = self.residents(rng)
         return {
             sector_id: np.tile(self._profile * self.daily_volume_m3(people), days)

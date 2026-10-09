@@ -1,4 +1,4 @@
-"""Pruebas del ScenarioBuilder: mezcla de YAML, sobrescrituras y validación final."""
+"""ScenarioBuilder tests: YAML merging, overrides and final validation."""
 
 from pathlib import Path
 

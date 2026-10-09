@@ -1,4 +1,4 @@
-"""Regresión del escenario normal: el tanque debe vaciarse y rebosar a ratos, no quedar lleno."""
+"""Regression test of the normal scenario: the tank drains and overflows now and then."""
 
 from pathlib import Path
 

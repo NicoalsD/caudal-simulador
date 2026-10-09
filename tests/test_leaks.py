@@ -1,4 +1,4 @@
-"""Pruebas de las fugas: frecuencia de Poisson, caudal y reporte de la comunidad."""
+"""Leak tests: Poisson frequency, flow and community reports."""
 
 from pathlib import Path
 

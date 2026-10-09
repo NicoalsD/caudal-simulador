@@ -1,4 +1,4 @@
-"""Pruebas de validación de escenarios YAML."""
+"""Scenario YAML validation tests."""
 
 from pathlib import Path
 
@@ -13,7 +13,7 @@ EXPECTED_GAUGE_MAX = 5.0
 
 
 def _write_variant(tmp_path: Path, old: str, new: str) -> Path:
-    """Copia normal.yaml cambiando un único fragmento, para probar un error concreto."""
+    """Copies normal.yaml changing a single fragment, to test a specific error."""
     text = NORMAL_YAML.read_text(encoding="utf-8")
     assert old in text, f"el fragmento {old!r} no está en normal.yaml"
     path = tmp_path / "variant.yaml"

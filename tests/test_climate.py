@@ -1,4 +1,4 @@
-"""Pruebas del modelo de días húmedos y secos (cadena de Markov por mes)."""
+"""Tests of the wet/dry day model (monthly Markov chain)."""
 
 from datetime import date
 
@@ -63,7 +63,7 @@ def test_climate_with_certain_rain_is_wet_every_day() -> None:
 
 
 def test_probabilities_switch_with_the_calendar_month() -> None:
-    # Enero nunca llueve; febrero siempre. Los días de enero no pueden ser húmedos.
+    # January never rains; February always does. January days cannot be wet.
     monthly = [
         _row(month, *((1.0, 1.0) if month == FEBRUARY else (0.0, 0.0)))
         for month in range(1, MONTHS_PER_YEAR + 1)

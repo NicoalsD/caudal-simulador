@@ -1,4 +1,4 @@
-"""Pruebas del caudal de la fuente: base, retardo de la lluvia y agua con barro."""
+"""Source flow tests: base, rain lag and muddy water."""
 
 import math
 
@@ -55,7 +55,7 @@ def test_rain_raises_the_flow_only_after_the_storm_starts() -> None:
 
 def test_response_decays_by_the_lag_constant_each_hour_once_rain_stops() -> None:
     series = LaggedRainSource(_spec()).simulate(_single_storm(10.0))
-    # La lluvia del día cae en sus 24 horas; el decaimiento se mide desde el día siguiente.
+    # The day's rain falls over its 24 hours; decay is measured from the next day.
     after_storm = (RAIN_DAY + 1) * HOURS_PER_DAY
     excess = series.flow_m3_per_hour - BASE_FLOW
     decay = math.exp(-1.0 / LAG_HOURS)

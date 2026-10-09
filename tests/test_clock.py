@@ -1,4 +1,4 @@
-"""Pruebas del reloj de la simulación (Singleton) y de sus flujos aleatorios."""
+"""Tests of the simulation clock (Singleton) and its random streams."""
 
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -17,7 +17,7 @@ RECONFIGURED_SEED = 2
 
 
 def _fresh_clock() -> SimulationClock:
-    """Reinicia el Singleton para que cada prueba empiece sin configuración previa."""
+    """Resets the Singleton so each test starts without previous configuration."""
     SimulationClock._instance = None
     return SimulationClock()
 
@@ -49,7 +49,7 @@ def test_clock_refuses_to_run_before_configuration() -> None:
 
 
 def test_naive_start_is_rejected() -> None:
-    naive_start = datetime(2026, 1, 1)  # sin zona horaria a propósito
+    naive_start = datetime(2026, 1, 1)  # no time zone on purpose
 
     with pytest.raises(ValueError, match="zona horaria"):
         _fresh_clock().configure(naive_start, seed=1)

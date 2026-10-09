@@ -1,4 +1,4 @@
-"""Pruebas de la separación entre datos observados (backend) y verdad de terreno."""
+"""Tests of the separation between observed data (backend) and ground truth."""
 
 from dataclasses import fields
 from pathlib import Path

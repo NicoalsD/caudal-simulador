@@ -1,39 +1,39 @@
-# Escenario normal: operación típica del acueducto veredal de Guaitarilla.
-# Los datos que genera este escenario son SIMULADOS.
-# Todos los parámetros viven aquí; el código no tiene valores de negocio.
-# Los valores marcados "supuesto, verificar" no vienen de medición.
+# Normal scenario: typical operation of the rural aqueduct of Guaitarilla.
+# The data this scenario generates is SIMULATED.
+# All parameters live here; the code has no business values.
+# Values marked "assumption, verify" do not come from measurement.
 
 meta:
   name: normal
   description: Operación típica con régimen bimodal. Línea base de las pruebas.
-  # Zona horaria del acueducto (Colombia no tiene horario de verano).
+  # Time zone of the aqueduct (Colombia has no daylight saving time).
   timezone: America/Bogota
-  # Primer día de la simulación. Fecha fija: nunca se toma la hora del sistema.
+  # First day of the simulation. Fixed date: the system clock is never used.
   start_date: 2026-01-01
-  # Siempre true: el escenario produce datos simulados por definición.
+  # Always true: the scenario produces simulated data by definition.
   simulated: true
-  # Semilla por defecto. La misma semilla y el mismo escenario dan los mismos datos.
+  # Default seed. The same seed and the same scenario give the same data.
   default_seed: 42
 
 tank:
-  # Área de la sección horizontal del tanque, en m². Supuesto, verificar con medición en campo.
+  # Cross-section area of the tank, in m². Assumption, verify with field measurement.
   area_m2: 12.0
-  # Regla pintada del tanque, en metros. Valores de ejemplo de la semilla:
-  # la Junta define el rango real.
+  # Painted gauge of the tank, in meters. Example values from the seed:
+  # the board defines the real range.
   gauge_min: 0.0
   gauge_max: 5.0
-  # Paso de precisión de la regla, en metros. Supuesto, verificar con la regla pintada.
+  # Precision step of the gauge, in meters. Assumption, verify with the painted gauge.
   gauge_step: 0.1
-  # Nivel al inicio de la simulación, en metros. Supuesto, verificar.
+  # Level at the start of the simulation, in meters. Assumption, verify.
   initial_gauge: 3.4
 
 climate:
-  # Régimen bimodal andino: dos temporadas de lluvia al año (abril-mayo y octubre-noviembre).
-  # Supuesto, verificar con datos del IDEAM o de una estación cercana.
-  # p_wet_after_dry: probabilidad de que un día seco sea húmedo (llueva).
-  # p_wet_after_wet: probabilidad de que un día húmedo siga húmedo.
-  # gamma_shape y gamma_scale_mm: lluvia de un día húmedo (mm), distribución gamma.
-  # Supuesto, verificar con pluviómetro local.
+  # Andean bimodal regime: two rainy seasons per year (April-May and October-November).
+  # Assumption, verify with IDEAM data or a nearby station.
+  # p_wet_after_dry: probability that a dry day is wet (it rains).
+  # p_wet_after_wet: probability that a wet day stays wet.
+  # gamma_shape and gamma_scale_mm: rain on a wet day (mm), gamma distribution.
+  # Assumption, verify with a local rain gauge.
   monthly:
     - {month: 1, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45, gamma_shape: 0.8, gamma_scale_mm: 6.0}
     - {month: 2, p_wet_after_dry: 0.30, p_wet_after_wet: 0.50, gamma_shape: 0.8, gamma_scale_mm: 7.0}
@@ -49,79 +49,82 @@ climate:
     - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}
 
 source:
-  # Caudal base de la fuente, en m³ por hora (unos 0,1 L/s). Supuesto, verificar con aforo.
-  # Calibrado para que la entrada media se parezca a la entrega media. Ver
+  # Base flow of the source, in m³ per hour (about 0.1 L/s). Assumption, verify with a flow measurement.
+  # Calibrated so that the mean inflow is close to the mean delivery. See
   # tests/test_normal_scenario.py.
   base_flow_m3_per_hour: 0.4
-  # Aumento del caudal por cada mm de lluvia, con retardo. Supuesto, verificar con aforo.
+  # Flow increase per mm of rain, with lag. Assumption, verify with a flow measurement.
   rain_gain_m3_per_hour_per_mm: 0.03
-  # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar.
-  # Supuesto, verificar con el hidrograma de la fuente.
+  # Response constant of the catchment, in hours: the flow takes time to react.
+  # Assumption, verify with the hydrograph of the source.
   response_lag_hours: 36
-  # Lluvia de un día, en mm, a partir de la cual el agua llega con barro.
-  # Supuesto, verificar con la Junta.
+  # Daily rain, in mm, from which the water arrives muddy.
+  # Assumption, verify with the board.
   muddy_rain_threshold_mm: 20.0
-  # Horas que dura el agua con barro después de una lluvia fuerte.
-  # Supuesto, verificar con la Junta.
+  # Hours the muddy water lasts after a heavy rain.
+  # Assumption, verify with the board.
   muddy_duration_hours: 48
 
 sectors:
-  # Sectores de la vereda. Cada uno tiene una válvula (ver la sección de turnos).
-  # Número de hogares: supuesto, verificar con censo local.
+  # Sectors of the village. Each one has a valve (see the schedule section).
+  # Number of households: assumption, verify with a local census.
   - {id: alto, name: Sector Alto, households: 38}
   - {id: centro, name: Sector Centro, households: 52}
   - {id: bajo, name: Sector Bajo, households: 45}
 
 demand:
-  # Dotación por persona, en litros por día. Valor de referencia de la RAS 0330/2017 para
-  # más de 2.000 msnm. Supuesto, verificar en la norma vigente.
+  # Allowance per person, in liters per day. Reference value of RAS 0330/2017 for
+  # more than 2,000 m a.s.l. Assumption, verify against the current standard.
   liters_per_person_per_day: 100
-  # Personas por hogar: sorteo entero entre el mínimo y el máximo. Supuesto, verificar.
+  # People per household: integer draw between the minimum and the maximum.
+  # Assumption, verify.
   persons_min: 3
   persons_max: 4
-  # Perfil horario (pesos relativos, de la hora 0 a la 23). Pico matutino y vespertino.
-  # Supuesto, verificar con la Junta.
+  # Hourly profile (relative weights, hour 0 to 23). Morning and evening peaks.
+  # Assumption, verify with the board.
   hourly_weights: [0.5, 0.4, 0.3, 0.3, 0.5, 1.5, 3.0, 3.5, 2.5, 1.5, 1.2, 1.5,
                    2.0, 1.5, 1.2, 1.2, 1.5, 2.8, 3.2, 2.5, 1.5, 1.0, 0.8, 0.6]
 
 schedule:
-  # Horario publicado que se repite cada día. Cada turno abre la válvula de un sector
-  # entre start_hour y end_hour (horas del día, de 0 a 24). Supuesto, verificar con la Junta.
+  # Published schedule, repeated every day. Each shift opens the valve of a sector
+  # between start_hour and end_hour (hours of the day, from 0 to 24).
+  # Assumption, verify with the board.
   turns:
     - {sector: alto, start_hour: 5, end_hour: 9}
     - {sector: centro, start_hour: 9, end_hour: 13}
     - {sector: bajo, start_hour: 13, end_hour: 17}
     - {sector: alto, start_hour: 17, end_hour: 21}
-  # Cumplimiento del fontanero por turno: cumplido, a medias o no cumplido. Deben sumar 1.
-  # Supuesto, verificar con el registro de la Junta.
+  # Plumber compliance per shift: completed, partial or not executed. Must add up to 1.
+  # Assumption, verify with the board's records.
   p_completed: 0.80
   p_partial: 0.15
   p_not_executed: 0.05
 
 leaks:
-  # Fugas nuevas por mes (tasa de un proceso de Poisson). Supuesto, verificar con la historia
-  # del acueducto.
+  # New leaks per month (rate of a Poisson process). Assumption, verify with the
+  # history of the aqueduct.
   rate_per_month: 0.8
-  # Caudal de una fuga, en m³ por hora. Supuesto, verificar con medición.
+  # Flow of one leak, in m³ per hour. Assumption, verify with measurement.
   flow_m3_per_hour: 0.3
-  # Días que tarda la reparación: un entero al azar entre el mínimo y el máximo.
-  # Supuesto, verificar con el registro de reparaciones.
+  # Days the repair takes: an integer drawn at random between the minimum and the maximum.
+  # Assumption, verify with the repair records.
   repair_days_min: 1
   repair_days_max: 5
-  # Probabilidad diaria de que una familia reporte la fuga a la comunidad.
-  # Supuesto, verificar con el uso del formulario público.
+  # Daily probability that a household reports the leak to the community.
+  # Assumption, verify with the use of the public form.
   report_probability_per_day: 0.3
 
 readings:
-  # Horas del día en que el fontanero anota la regla. Supuesto, verificar con la rutina real.
+  # Hours of the day when the plumber notes the gauge. Assumption, verify with the actual routine.
   hours: [6, 17]
-  # Desviación típica del error al leer la regla, en metros. Supuesto, verificar en campo.
+  # Standard deviation of the error when reading the gauge, in meters.
+  # Assumption, verify in the field.
   noise_sd_m: 0.03
-  # Probabilidad de que una lectura llegue dos veces (duplicado). Supuesto, verificar en la app.
+  # Probability that a reading arrives twice (duplicate). Assumption, verify in the app.
   duplicate_probability: 0.02
-  # Probabilidad de que una lectura quede sin señal y llegue horas después.
-  # Supuesto, verificar con la cobertura de la vereda.
+  # Probability that a reading is sent without signal and arrives hours later.
+  # Assumption, verify with the village's coverage.
   no_signal_probability: 0.05
-  # Retraso máximo de una lectura sin señal, en horas (sorteo uniforme de 1 al máximo).
-  # Supuesto, verificar con la cobertura de la vereda.
+  # Maximum delay of a reading sent without signal, in hours (uniform draw from 1 to the maximum).
+  # Assumption, verify with the village's coverage.
   max_delay_hours: 12

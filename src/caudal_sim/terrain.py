@@ -1,8 +1,8 @@
-"""Datos de terreno: el motor horario y la separación entre lo observado y la verdad.
+"""Field data: the hourly engine and the split between observed data and ground truth.
 
-Lo observado es lo que llegaría al backend (lecturas, turnos y reportes de la comunidad).
-La verdad de terreno (nivel real, demanda, fugas, rebose) nunca se envía al backend y se
-guarda aparte.
+Observed data is what would reach the backend (readings, shifts and community reports).
+The ground truth (true level, demand, leaks, overflow) is never sent to the backend and is
+stored separately.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ STREAM_TRANSMISSION = "transmision"
 
 @dataclass(frozen=True)
 class DamageReport:
-    """Reporte de daño de una familia por el formulario público. No tiene datos personales."""
+    """Damage report from a household via the public form. Contains no personal data."""
 
     report_id: int
     day_index: int
@@ -51,7 +51,7 @@ class DamageReport:
 
 @dataclass(frozen=True)
 class ObservedData:
-    """Lo que llegaría al backend por las puertas de la API."""
+    """What would reach the backend through the API."""
 
     readings: tuple[TransmittedReading, ...]
     shift_executions: tuple[ShiftExecution, ...]
@@ -60,7 +60,7 @@ class ObservedData:
 
 @dataclass(frozen=True)
 class TruthData:
-    """Verdad de terreno: lo que pasó de verdad. Nunca se envía al backend."""
+    """Ground truth: what really happened. Never sent to the backend."""
 
     daily_rain_mm: npt.NDArray[np.float64]
     inflow_m3_per_hour: npt.NDArray[np.float64]
@@ -75,7 +75,7 @@ class TruthData:
 
 @dataclass(frozen=True)
 class SimulationRun:
-    """Una corrida completa: metadatos, datos observados y verdad de terreno."""
+    """A complete run: metadata, observed data and ground truth."""
 
     scenario_name: str
     timezone: str
@@ -87,10 +87,10 @@ class SimulationRun:
 
 
 def run_simulation(scenario: Scenario, days: int, seed: int) -> SimulationRun:
-    """Corre el gemelo digital durante `days` días con la semilla dada.
+    """Runs the digital twin for `days` days with the given seed.
 
-    Cada componente usa su propio flujo aleatorio con nombre, así que agregar un componente
-    no cambia los datos de los demás. El reloj único se reconfigura al inicio de cada corrida.
+    Each component uses its own named random stream, so adding a component does not change
+    the data of the others. The single clock is reconfigured at the start of each run.
     """
     clock = SimulationClock()
     start = datetime.combine(

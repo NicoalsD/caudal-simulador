@@ -1,7 +1,7 @@
-"""Modelos Pydantic de los escenarios YAML del simulador.
+"""Pydantic models of the simulator's YAML scenarios.
 
-Cada escenario declara todos sus parámetros. Los campos extra se rechazan,
-para que un error de escritura en el YAML no pase en silencio.
+Each scenario declares all its parameters. Extra fields are rejected,
+so that a typo in the YAML does not pass silently.
 """
 
 from datetime import date
@@ -14,11 +14,11 @@ from caudal_sim.clock import HOURS_PER_DAY
 
 
 class ScenarioError(ValueError):
-    """Un escenario no se puede leer o no pasa la validación. El mensaje va en español."""
+    """A scenario cannot be read or fails validation. The message is in Spanish."""
 
 
 class ScenarioMeta(BaseModel):
-    """Datos generales del escenario: nombre, zona horaria, fecha de inicio y semilla."""
+    """General scenario data: name, time zone, start date and seed."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -40,7 +40,7 @@ class ScenarioMeta(BaseModel):
 
 
 class TankSpec(BaseModel):
-    """Tanque y regla pintada. El nivel del tanque se acota a esta regla."""
+    """Tank and gauge rule. The tank level is bounded to this rule."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -65,7 +65,7 @@ MONTHS_PER_YEAR = 12
 
 
 class MonthClimate(BaseModel):
-    """Lluvia de un mes: probabilidades de día húmedo y forma y escala de la gamma (mm)."""
+    """Rain of one month: wet-day probabilities and the gamma shape and scale (mm)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -77,7 +77,7 @@ class MonthClimate(BaseModel):
 
 
 class ClimateSpec(BaseModel):
-    """Clima del escenario: una fila por mes, de enero (1) a diciembre (12)."""
+    """Scenario climate: one row per month, from January (1) to December (12)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -92,7 +92,7 @@ class ClimateSpec(BaseModel):
 
 
 class SourceSpec(BaseModel):
-    """Fuente: caudal base, respuesta a la lluvia con retardo y umbral de agua con barro."""
+    """Source: base flow, rain response with lag and muddy-water threshold."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -104,7 +104,7 @@ class SourceSpec(BaseModel):
 
 
 class SectorSpec(BaseModel):
-    """Sector del acueducto: un grupo de hogares que comparte una válvula."""
+    """Aqueduct sector: a group of households that share one valve."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -114,14 +114,14 @@ class SectorSpec(BaseModel):
 
 
 class DemandSpec(BaseModel):
-    """Demanda de agua: dotación por persona, personas por hogar y perfil horario."""
+    """Water demand: allowance per person, people per household and hourly profile."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     liters_per_person_per_day: float = Field(gt=0)
     persons_min: int = Field(ge=1)
     persons_max: int = Field(ge=1)
-    # Pesos relativos de cada hora del día (0 a 23). El código los normaliza a fracciones.
+    # Relative weights of each hour of the day (0 to 23). The code normalizes them to fractions.
     hourly_weights: list[float] = Field(min_length=HOURS_PER_DAY, max_length=HOURS_PER_DAY)
 
     @model_validator(mode="after")
@@ -139,7 +139,7 @@ PROBABILITY_SUM_TOLERANCE = 1e-9
 
 
 class TurnSpec(BaseModel):
-    """Turno publicado: abre la válvula de un sector en una ventana de horas del día."""
+    """Published shift: opens a sector's valve in a window of hours of the day."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -155,7 +155,7 @@ class TurnSpec(BaseModel):
 
 
 class ScheduleSpec(BaseModel):
-    """Horario publicado y probabilidades de cumplimiento de cada turno."""
+    """Published schedule and compliance probabilities of each shift."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -173,7 +173,7 @@ class ScheduleSpec(BaseModel):
 
 
 class LeakSpec(BaseModel):
-    """Fugas: tasa mensual de Poisson, caudal, tiempo de reparación y reporte de la comunidad."""
+    """Leaks: monthly Poisson rate, flow, repair time and community report."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -191,7 +191,7 @@ class LeakSpec(BaseModel):
 
 
 class ReadingSpec(BaseModel):
-    """Lecturas del fontanero: horas del día en que lee la regla y error de la lectura."""
+    """Operator readings: hours of the day when the gauge is read and reading error."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -211,7 +211,7 @@ class ReadingSpec(BaseModel):
 
 
 class Scenario(BaseModel):
-    """Escenario completo validado. Es inmutable una vez construido."""
+    """Complete validated scenario. Immutable once built."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 

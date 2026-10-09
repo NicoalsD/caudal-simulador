@@ -1,4 +1,4 @@
-"""Turnos: cumplimiento del horario publicado (cumplido, a medias o no cumplido)."""
+"""Shifts: compliance with the published schedule (completed, partial or not executed)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from caudal_sim.scenario import ScheduleSpec
 
 
 class ShiftOutcome(StrEnum):
-    """Resultado de un turno, tal como lo registra el fontanero al final del día."""
+    """Outcome of a shift, as the operator records it at the end of the day."""
 
     COMPLETED = "COMPLETED"
     PARTIAL = "PARTIAL"
@@ -23,7 +23,7 @@ class ShiftOutcome(StrEnum):
 
 @dataclass(frozen=True)
 class ShiftExecution:
-    """Un turno de un día: su ventana publicada, su resultado y las horas abiertas."""
+    """One shift of one day: its published window, its outcome and the open hours."""
 
     day_index: int
     sector_id: str
@@ -35,19 +35,19 @@ class ShiftExecution:
 
 @dataclass(frozen=True)
 class ShiftRun:
-    """Válvulas abiertas por hora (una serie por sector) y el registro de los turnos."""
+    """Open valves per hour (one series per sector) and the shift record."""
 
     valve_open: dict[str, npt.NDArray[np.bool_]]
     executions: tuple[ShiftExecution, ...]
 
 
 class ShiftSimulator:
-    """Sigue el horario publicado y decide, por turno, si se cumplió.
+    """Follows the published schedule and decides, per shift, whether it was complied with.
 
-    Cumplido abre la válvula en toda la ventana. A medias la cierra a la mitad de la
-    ventana. No cumplido no la abre. Un sector puede tener varios turnos en el día.
+    Completed opens the valve for the whole window. Partial closes it halfway through the
+    window. Not executed does not open it. A sector may have several shifts in a day.
 
-    Sin @pattern: el horario es un dato del escenario, no un algoritmo intercambiable.
+    Without @pattern: the schedule is scenario data, not an interchangeable algorithm.
     """
 
     def __init__(self, schedule: ScheduleSpec, sector_ids: Sequence[str]) -> None:

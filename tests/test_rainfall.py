@@ -1,4 +1,4 @@
-"""Pruebas de la cantidad de lluvia (gamma por mes) y de su reproducibilidad."""
+"""Tests of rain amount (gamma per month) and its reproducibility."""
 
 from datetime import date
 
