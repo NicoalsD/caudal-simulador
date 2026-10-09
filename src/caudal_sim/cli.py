@@ -16,6 +16,7 @@ from caudal_sim.builder import ScenarioBuilder
 from caudal_sim.config import ENV_PREFIX, SimulatorSettings
 from caudal_sim.demo_guard import NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
+from caudal_sim.minutes_export import export_confirmed_executions
 from caudal_sim.scenario import Scenario, ScenarioError
 from caudal_sim.signing import SigningKeyError
 from caudal_sim.terrain import run_simulation
@@ -67,6 +68,36 @@ def main() -> None:
 def version() -> None:
     """Muestra la versión del simulador."""
     typer.echo(f"caudal-sim {__version__}")
+
+
+@app.command("export-actas")
+def export_actas(
+    scenario: Annotated[
+        str,
+        typer.Option(help="Nombre del escenario (scenarios/<nombre>.yaml) o ruta a un archivo."),
+    ] = DEFAULT_SCENARIO,
+    days: Annotated[
+        int,
+        typer.Option(help="Días a simular.", min=MIN_DAYS),
+    ] = DEFAULT_DAYS,
+    seed: Annotated[
+        int | None,
+        typer.Option(help="Semilla. Por defecto, la del escenario."),
+    ] = None,
+    out: Annotated[
+        Path,
+        typer.Option(help="Carpeta donde se escriben los archivos de actas."),
+    ] = DEFAULT_OUTPUT,
+    export_format: Annotated[
+        ExportChoice,
+        typer.Option("--format", help="Formato de los archivos: csv, parquet o both."),
+    ] = ExportChoice.BOTH,
+) -> None:
+    """Exporta las ejecuciones de turnos confirmadas para las actas. Solo datos observados."""
+    resolved = _resolve_scenario(scenario, seed)
+    run = run_simulation(resolved, days, resolved.meta.default_seed)
+    manifest = export_confirmed_executions(run, out, FORMATS_BY_CHOICE[export_format])
+    typer.echo(f"Ejecuciones confirmadas ({days} días) en {out}. Manifiesto: {manifest}")
 
 
 @app.command()
