@@ -1,0 +1,17 @@
+name: Tarea técnica
+description: Configuración, refactor, pruebas o documentación sin cambio funcional.
+title: "chore: "
+labels: ["tipo:chore"]
+body:
+  - type: textarea
+    id: tarea
+    attributes:
+      label: Tarea
+    validations:
+      required: true
+  - type: textarea
+    id: hecho
+    attributes:
+      label: Cuándo se considera terminada
+    validations:
+      required: true

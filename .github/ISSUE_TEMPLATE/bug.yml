@@ -1,0 +1,29 @@
+name: Error
+description: Algo no funciona como dice la documentación.
+title: "fix: "
+labels: ["tipo:fix"]
+body:
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué se esperaba
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducirlo
+      value: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "No incluyas contraseñas, tokens ni datos personales. Las vulnerabilidades se reportan por la pestaña Security (reporte privado)."
