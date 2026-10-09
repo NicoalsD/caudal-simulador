@@ -7,6 +7,7 @@ the valve reaches the requested position, or FAILED when the valve faults.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
@@ -23,6 +24,14 @@ TARGET_STATUS: dict[ValveCommandKind, ValveStatus] = {
     ValveCommandKind.OPEN: ValveStatus.OPEN,
     ValveCommandKind.CLOSE: ValveStatus.CLOSED,
 }
+
+
+@dataclass(frozen=True)
+class ExecutorState:
+    """Saved progress of a node: the command in flight and the last status it published."""
+
+    in_flight: ValveCommand | None
+    last_status: ValveStatus
 
 
 class ValveCommandExecutor:
@@ -56,6 +65,15 @@ class ValveCommandExecutor:
             self._in_flight = winner
         self._publish_status_change(now)
         self._confirm_in_flight(now)
+
+    def capture(self) -> ExecutorState:
+        """Saved progress of the node, independent of later polls."""
+        return ExecutorState(in_flight=self._in_flight, last_status=self._last_status)
+
+    def restore(self, state: ExecutorState) -> None:
+        """Puts the node back at a saved progress. Commands are immutable, so they are shared."""
+        self._in_flight = state.in_flight
+        self._last_status = state.last_status
 
     def _confirm_in_flight(self, now: datetime) -> None:
         command = self._in_flight

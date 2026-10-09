@@ -90,6 +90,15 @@ class TankBalanceStep(SimulationStep):
         """Result of the most recent step, or None before the first one."""
         return self._last
 
+    def capture(self) -> float:
+        """Volume of the tank, in m³."""
+        return self._tank.volume_m3
+
+    def restore(self, volume_m3: float) -> None:
+        """Puts the tank back at a saved volume."""
+        self._tank.restore_volume(volume_m3)
+        self._last = None
+
     def _advance(self, now: datetime, elapsed: timedelta) -> None:
         hours = elapsed / ONE_HOUR
         self._last = self._tank.step(

@@ -7,11 +7,18 @@ maximum travel time stops the motor and goes to FAULT.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import Protocol
 
 from caudal_sim.actuator_driver import ActuatorDriver, MotorDirection
-from caudal_sim.valve_state import ClosedState, ValveEvent, ValveState, ValveStatus
+from caudal_sim.valve_state import (
+    ClosedState,
+    ValveEvent,
+    ValveState,
+    ValveStatus,
+    state_for,
+)
 
 TRAVELLING_STATUSES = frozenset({ValveStatus.OPENING, ValveStatus.CLOSING})
 
@@ -31,6 +38,19 @@ class Actuator(Protocol):
 
     def advance(self, elapsed: timedelta) -> None:
         """Moves the simulated time forward by `elapsed`."""
+
+
+def _direction_of(status: ValveStatus) -> MotorDirection:
+    """Motor direction of a travelling status."""
+    return MotorDirection.OPEN if status is ValveStatus.OPENING else MotorDirection.CLOSE
+
+
+@dataclass(frozen=True)
+class ValveActuatorState:
+    """Saved state of a valve: its position and how far the current travel has gone."""
+
+    status: ValveStatus
+    travelled: timedelta
 
 
 class ValveActuator:
@@ -74,6 +94,20 @@ class ValveActuator:
                 self._apply(ValveEvent.CLOSED_LIMIT_REACHED)
         elif self._travelled >= self._max_travel_time:
             self._apply(ValveEvent.TRAVEL_TIMEOUT)
+
+    def capture(self) -> ValveActuatorState:
+        """Saved state of the valve, independent of later changes."""
+        return ValveActuatorState(status=self.status, travelled=self._travelled)
+
+    def restore(self, state: ValveActuatorState) -> None:
+        """Puts the valve back in a saved state and makes the motor match it."""
+        if state.travelled < timedelta(0):
+            raise ValueError("el recorrido guardado no puede ser negativo")
+        self._state = state_for(state.status)
+        self._travelled = state.travelled
+        self._driver.stop()
+        if state.status in TRAVELLING_STATUSES:
+            self._driver.start(_direction_of(state.status))
 
     def _apply(self, event: ValveEvent) -> None:
         previous = self.status

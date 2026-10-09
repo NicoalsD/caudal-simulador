@@ -67,6 +67,15 @@ class CommandSource(Protocol):
         """Records the result that the valve node reports for a delivered command."""
 
 
+@dataclass(frozen=True)
+class LedgerEntryState:
+    """Saved status of one command, with the detail of its confirmation."""
+
+    command_id: UUID
+    status: CommandStatus
+    ack_detail: str
+
+
 @dataclass
 class _Entry:
     command: ValveCommand
@@ -89,6 +98,26 @@ class CommandLedger(CommandSource):
 
     def status_of(self, command_id: UUID) -> CommandStatus:
         return self._entry(command_id).status
+
+    def command(self, command_id: UUID) -> ValveCommand:
+        """The command with that identifier, as it was enqueued."""
+        return self._entry(command_id).command
+
+    def capture(self) -> tuple[LedgerEntryState, ...]:
+        """Saved status of every command, ordered by identifier."""
+        return tuple(
+            LedgerEntryState(command_id, entry.status, entry.ack_detail)
+            for command_id, entry in sorted(self._entries.items(), key=lambda item: str(item[0]))
+        )
+
+    def restore(self, states: tuple[LedgerEntryState, ...]) -> None:
+        """Puts every command back in a saved status. The same commands must be enqueued."""
+        if {state.command_id for state in states} != set(self._entries):
+            raise ValueError("el estado guardado no corresponde a los mismos comandos")
+        for state in states:
+            entry = self._entries[state.command_id]
+            entry.status = state.status
+            entry.ack_detail = state.ack_detail
 
     def ack_detail_of(self, command_id: UUID) -> str:
         """Detail sent with the confirmation of a command, empty while it is not confirmed."""

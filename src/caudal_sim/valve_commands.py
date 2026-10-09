@@ -62,6 +62,21 @@ class ValveCommand(ABC):
     def expires_at(self) -> datetime:
         return self._expires_at
 
+    def __eq__(self, other: object) -> bool:
+        """Two commands are equal when they carry the same order, valve and window."""
+        if not isinstance(other, ValveCommand):
+            return NotImplemented
+        return (
+            type(self) is type(other)
+            and self._command_id == other._command_id
+            and self._valve_id == other._valve_id
+            and self._not_before == other._not_before
+            and self._expires_at == other._expires_at
+        )
+
+    def __hash__(self) -> int:
+        return hash((self.kind, self._command_id))
+
     def is_executable_at(self, now: datetime) -> bool:
         """True inside `[not_before, expires_at)`."""
         return self._not_before <= now < self._expires_at
