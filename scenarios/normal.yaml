@@ -55,11 +55,14 @@ source:
   base_flow_m3_per_hour: 0.4
   # Aumento del caudal por cada mm de lluvia, con retardo. Supuesto, verificar con aforo.
   rain_gain_m3_per_hour_per_mm: 0.03
-  # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar. Supuesto.
+  # Constante de respuesta de la cuenca, en horas: el caudal tarda en reaccionar.
+  # Supuesto, verificar con el hidrograma de la fuente.
   response_lag_hours: 36
-  # Lluvia de un día, en mm, a partir de la cual el agua llega con barro. Supuesto.
+  # Lluvia de un día, en mm, a partir de la cual el agua llega con barro.
+  # Supuesto, verificar con la Junta.
   muddy_rain_threshold_mm: 20.0
-  # Horas que dura el agua con barro después de una lluvia fuerte. Supuesto.
+  # Horas que dura el agua con barro después de una lluvia fuerte.
+  # Supuesto, verificar con la Junta.
   muddy_duration_hours: 48
 
 sectors:
@@ -101,10 +104,12 @@ leaks:
   rate_per_month: 0.8
   # Caudal de una fuga, en m³ por hora. Supuesto, verificar con medición.
   flow_m3_per_hour: 0.3
-  # Días que tarda la reparación: un entero al azar entre el mínimo y el máximo. Supuesto.
+  # Días que tarda la reparación: un entero al azar entre el mínimo y el máximo.
+  # Supuesto, verificar con el registro de reparaciones.
   repair_days_min: 1
   repair_days_max: 5
-  # Probabilidad diaria de que una familia reporte la fuga a la comunidad. Supuesto.
+  # Probabilidad diaria de que una familia reporte la fuga a la comunidad.
+  # Supuesto, verificar con el uso del formulario público.
   report_probability_per_day: 0.3
 
 readings:
@@ -114,7 +119,9 @@ readings:
   noise_sd_m: 0.03
   # Probabilidad de que una lectura llegue dos veces (duplicado). Supuesto, verificar en la app.
   duplicate_probability: 0.02
-  # Probabilidad de que una lectura quede sin señal y llegue horas después. Supuesto.
+  # Probabilidad de que una lectura quede sin señal y llegue horas después.
+  # Supuesto, verificar con la cobertura de la vereda.
   no_signal_probability: 0.05
   # Retraso máximo de una lectura sin señal, en horas (sorteo uniforme de 1 al máximo).
+  # Supuesto, verificar con la cobertura de la vereda.
   max_delay_hours: 12
