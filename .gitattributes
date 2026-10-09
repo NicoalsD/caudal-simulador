@@ -1,0 +1,7 @@
+# Normaliza finales de linea
+* text=auto eol=lf
+.githooks/* text eol=lf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.drawio text eol=lf
