@@ -11,12 +11,13 @@ from pydantic import ValidationError
 
 from caudal_sim import __version__
 from caudal_sim.api_client import ApiError
-from caudal_sim.backfill import ImportKind, ImportLimitError, run_backfill
+from caudal_sim.backfill import BackfillOptions, ImportKind, ImportLimitError, run_backfill
 from caudal_sim.builder import ScenarioBuilder
 from caudal_sim.config import ENV_PREFIX, SimulatorSettings
 from caudal_sim.demo_guard import NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
 from caudal_sim.scenario import Scenario, ScenarioError
+from caudal_sim.signing import SigningKeyError
 from caudal_sim.terrain import run_simulation
 
 SCENARIOS_DIR = Path("scenarios")
@@ -181,7 +182,7 @@ def _run_backfill(
     settings = _settings_or_exit()
     run = run_simulation(resolved, days, resolved.meta.default_seed)
     try:
-        summary = run_backfill(kind, resolved, run, settings, dry_run=dry_run)
+        summary = run_backfill(kind, resolved, run, settings, BackfillOptions(dry_run=dry_run))
     except NonDemoTargetError as error:
         typer.echo(f"Error: {error.message}", err=True)
         raise typer.Exit(code=EXIT_IMPORT_ERROR) from error
@@ -190,6 +191,9 @@ def _run_backfill(
         raise typer.Exit(code=EXIT_IMPORT_ERROR) from error
     except ImportLimitError as error:
         typer.echo(f"Error: {error}", err=True)
+        raise typer.Exit(code=EXIT_IMPORT_ERROR) from error
+    except SigningKeyError as error:
+        typer.echo(f"Error: {error.message}", err=True)
         raise typer.Exit(code=EXIT_IMPORT_ERROR) from error
 
     if summary.dry_run:
@@ -200,7 +204,8 @@ def _run_backfill(
         return
     typer.echo(
         f"Importación ({kind.value}): {summary.rows_accepted} filas aceptadas, "
-        f"{summary.rows_rejected} rechazadas, en {summary.batches} lotes."
+        f"{summary.rows_rejected} rechazadas, en {summary.batches} lotes. "
+        f"Manifiesto firmado: {summary.manifest_path}"
     )
 
 

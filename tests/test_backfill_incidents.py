@@ -9,7 +9,7 @@ import respx
 from pydantic import SecretStr
 
 from caudal_sim.api_payload import ApiPayloadAdapter, ImportContext
-from caudal_sim.backfill import ImportKind, run_backfill
+from caudal_sim.backfill import BackfillOptions, ImportKind, run_backfill
 from caudal_sim.builder import load_scenario
 from caudal_sim.config import SimulatorSettings
 from caudal_sim.terrain import DAMAGE_CATEGORY_LEAK, DamageReport, run_simulation
@@ -24,7 +24,7 @@ SIMULATED_DAYS = 120
 SEED = 3
 
 
-def _settings() -> SimulatorSettings:
+def _settings(private_key_path: Path) -> SimulatorSettings:
     return SimulatorSettings(
         _env_file=None,  # type: ignore[call-arg]
         api_base_url=BASE_URL,
@@ -33,20 +33,29 @@ def _settings() -> SimulatorSettings:
         demo_aqueduct_slug=SLUG,
         aqueduct_id=AQUEDUCT_ID,
         tank_id=TANK_ID,
+        private_key_path=private_key_path,
     )
 
 
-def test_each_damage_report_becomes_one_incident_row_with_leak_category() -> None:
+def test_each_damage_report_becomes_one_incident_row_with_leak_category(
+    private_key_path: Path,
+) -> None:
     scenario = load_scenario(NORMAL_YAML)
     run = run_simulation(scenario, SIMULATED_DAYS, SEED)
 
-    summary = run_backfill(ImportKind.INCIDENTS, scenario, run, _settings(), dry_run=True)
+    summary = run_backfill(
+        ImportKind.INCIDENTS,
+        scenario,
+        run,
+        _settings(private_key_path),
+        BackfillOptions(dry_run=True),
+    )
 
     assert summary.rows_total == len(run.observed.damage_reports)
     assert all(report.category == DAMAGE_CATEGORY_LEAK for report in run.observed.damage_reports)
 
 
-def test_real_run_posts_incidents_with_known_sector_ids() -> None:
+def test_real_run_posts_incidents_with_known_sector_ids(private_key_path: Path) -> None:
     scenario = load_scenario(NORMAL_YAML)
     run = run_simulation(scenario, SIMULATED_DAYS, SEED)
     context = ImportContext(
@@ -70,7 +79,13 @@ def test_real_run_posts_incidents_with_known_sector_ids() -> None:
         router.post("/api/v1/auth/login").respond(200, json={"access_token": "token-de-prueba"})
         router.post(IMPORT_PATH).mock(side_effect=capture)
 
-        summary = run_backfill(ImportKind.INCIDENTS, scenario, run, _settings(), dry_run=False)
+        summary = run_backfill(
+            ImportKind.INCIDENTS,
+            scenario,
+            run,
+            _settings(private_key_path),
+            BackfillOptions(dry_run=False),
+        )
 
     assert summary.rows_accepted == len(run.observed.damage_reports)
     assert {row["sector_id"] for row in sent} <= known_sector_ids

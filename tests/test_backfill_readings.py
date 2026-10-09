@@ -17,6 +17,7 @@ from caudal_sim.backfill import (
     MAX_IMPORT_BODY_BYTES,
     MAX_IMPORT_ROWS,
     SHA256_HEX_LENGTH,
+    BackfillOptions,
     BatchMetadata,
     ImportKind,
     build_batches,
@@ -43,7 +44,7 @@ HEX_DIGITS = set("0123456789abcdef")
 METADATA = BatchMetadata(aqueduct_id=AQUEDUCT_ID, scenario_name="normal-year", seed=SEED)
 
 
-def _settings() -> SimulatorSettings:
+def _settings(private_key_path: Path) -> SimulatorSettings:
     return SimulatorSettings(
         _env_file=None,  # type: ignore[call-arg]
         api_base_url=BASE_URL,
@@ -52,6 +53,7 @@ def _settings() -> SimulatorSettings:
         demo_aqueduct_slug=SLUG,
         aqueduct_id=AQUEDUCT_ID,
         tank_id=TANK_ID,
+        private_key_path=private_key_path,
     )
 
 
@@ -114,10 +116,16 @@ def test_each_batch_hash_is_the_sha256_of_its_own_rows() -> None:
     assert set(batch.file_sha256) <= HEX_DIGITS
 
 
-def test_dry_run_counts_batches_and_never_contacts_the_api() -> None:
+def test_dry_run_counts_batches_and_never_contacts_the_api(private_key_path: Path) -> None:
     scenario, run = _run_and_scenario()
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
-        summary = run_backfill(ImportKind.READINGS, scenario, run, _settings(), dry_run=True)
+        summary = run_backfill(
+            ImportKind.READINGS,
+            scenario,
+            run,
+            _settings(private_key_path),
+            BackfillOptions(dry_run=True),
+        )
 
     assert router.calls.call_count == 0
     assert summary.dry_run is True
@@ -125,42 +133,66 @@ def test_dry_run_counts_batches_and_never_contacts_the_api() -> None:
     assert summary.rows_total == len(run.observed.readings) - summary.duplicates_skipped
 
 
-def test_duplicate_transmissions_are_skipped_and_counted() -> None:
+def test_duplicate_transmissions_are_skipped_and_counted(private_key_path: Path) -> None:
     scenario, run = _run_and_scenario()
     duplicates = sum(1 for reading in run.observed.readings if reading.is_duplicate)
 
-    summary = run_backfill(ImportKind.READINGS, scenario, run, _settings(), dry_run=True)
+    summary = run_backfill(
+        ImportKind.READINGS,
+        scenario,
+        run,
+        _settings(private_key_path),
+        BackfillOptions(dry_run=True),
+    )
 
     assert summary.duplicates_skipped == duplicates
 
 
-def test_real_run_sends_every_row_and_reports_what_the_api_accepted() -> None:
+def test_real_run_sends_every_row_and_reports_what_the_api_accepted(
+    private_key_path: Path,
+) -> None:
     scenario, run = _run_and_scenario()
     with respx.mock(base_url=BASE_URL) as router:
         _demo_router(router)
         router.post(IMPORT_PATH).mock(side_effect=_accept_all)
 
-        summary = run_backfill(ImportKind.READINGS, scenario, run, _settings(), dry_run=False)
+        summary = run_backfill(
+            ImportKind.READINGS,
+            scenario,
+            run,
+            _settings(private_key_path),
+            BackfillOptions(dry_run=False),
+        )
 
     assert summary.rows_accepted == summary.rows_total
     assert summary.rows_rejected == 0
     assert summary.batches >= 1
 
 
-def test_real_run_is_refused_for_a_real_aqueduct_and_sends_nothing() -> None:
+def test_real_run_is_refused_for_a_real_aqueduct_and_sends_nothing(
+    private_key_path: Path,
+) -> None:
     scenario, run = _run_and_scenario()
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
         _demo_router(router, is_demo=False)
         imported = router.post(IMPORT_PATH).respond(201)
 
         with pytest.raises(NonDemoTargetError):
-            run_backfill(ImportKind.READINGS, scenario, run, _settings(), dry_run=False)
+            run_backfill(
+                ImportKind.READINGS,
+                scenario,
+                run,
+                _settings(private_key_path),
+                BackfillOptions(dry_run=False),
+            )
 
     assert not imported.called
 
 
-def test_cli_dry_run_prints_counts_without_network(monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_environment(monkeypatch)
+def test_cli_dry_run_prints_counts_without_network(
+    monkeypatch: pytest.MonkeyPatch, private_key_path: Path
+) -> None:
+    _set_environment(monkeypatch, private_key_path)
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
         result = CliRunner().invoke(app, ["backfill", "readings", "--days", "1", "--dry-run"])
 
@@ -185,9 +217,9 @@ def test_cli_reports_missing_configuration_in_spanish(
 
 
 def test_cli_real_run_aborts_with_spanish_message_for_a_real_aqueduct(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, private_key_path: Path
 ) -> None:
-    _set_environment(monkeypatch)
+    _set_environment(monkeypatch, private_key_path)
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
         _demo_router(router, is_demo=False)
         result = CliRunner().invoke(app, ["backfill", "readings", "--days", "1"])
@@ -196,10 +228,11 @@ def test_cli_real_run_aborts_with_spanish_message_for_a_real_aqueduct(
     assert "no es el acueducto de demostración" in result.output
 
 
-def _set_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def _set_environment(monkeypatch: pytest.MonkeyPatch, private_key_path: Path) -> None:
     monkeypatch.setenv("CAUDAL_SIM_API_BASE_URL", BASE_URL)
     monkeypatch.setenv("CAUDAL_SIM_API_USERNAME", "project.team")
     monkeypatch.setenv("CAUDAL_SIM_API_PASSWORD", PASSWORD)
     monkeypatch.setenv("CAUDAL_SIM_DEMO_AQUEDUCT_SLUG", SLUG)
     monkeypatch.setenv("CAUDAL_SIM_AQUEDUCT_ID", str(AQUEDUCT_ID))
     monkeypatch.setenv("CAUDAL_SIM_TANK_ID", str(TANK_ID))
+    monkeypatch.setenv("CAUDAL_SIM_PRIVATE_KEY_PATH", str(private_key_path))

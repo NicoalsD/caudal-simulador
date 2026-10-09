@@ -11,7 +11,7 @@ import respx
 from pydantic import SecretStr
 from typer.testing import CliRunner
 
-from caudal_sim.backfill import ImportKind, run_backfill
+from caudal_sim.backfill import BackfillOptions, ImportKind, run_backfill
 from caudal_sim.builder import load_scenario
 from caudal_sim.cli import app
 from caudal_sim.config import SimulatorSettings
@@ -28,7 +28,7 @@ SEED = 11
 ALLOWED_STATUSES = {outcome.value for outcome in ShiftOutcome}
 
 
-def _settings() -> SimulatorSettings:
+def _settings(private_key_path: Path) -> SimulatorSettings:
     return SimulatorSettings(
         _env_file=None,  # type: ignore[call-arg]
         api_base_url=BASE_URL,
@@ -37,6 +37,7 @@ def _settings() -> SimulatorSettings:
         demo_aqueduct_slug=SLUG,
         aqueduct_id=UUID("0190f3a2-0000-7000-8000-0000000000bb"),
         tank_id=UUID("0190f3a2-2222-7000-8000-000000000001"),
+        private_key_path=private_key_path,
     )
 
 
@@ -60,18 +61,22 @@ def _run() -> tuple[Scenario, SimulationRun]:
     return scenario, run_simulation(scenario, SIMULATED_DAYS, SEED)
 
 
-def test_dry_run_has_one_row_per_observed_shift() -> None:
+def test_dry_run_has_one_row_per_observed_shift(private_key_path: Path) -> None:
     scenario, run = _run()
 
-    summary = run_backfill(ImportKind.SHIFT_EXECUTIONS, scenario, run, _settings(), dry_run=True)
+    summary = run_backfill(
+        ImportKind.SHIFT_EXECUTIONS,
+        scenario,
+        run,
+        _settings(private_key_path),
+        BackfillOptions(dry_run=True),
+    )
 
     assert summary.rows_total == len(run.observed.shift_executions)
     assert summary.duplicates_skipped == 0
 
 
-def test_real_run_sends_every_shift_with_a_contract_status(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_real_run_sends_every_shift_with_a_contract_status(private_key_path: Path) -> None:
     scenario, run = _run()
     sent: list[dict[str, Any]] = []
 
@@ -84,7 +89,11 @@ def test_real_run_sends_every_shift_with_a_contract_status(
         router.post(IMPORT_PATH).mock(side_effect=capture)
 
         summary = run_backfill(
-            ImportKind.SHIFT_EXECUTIONS, scenario, run, _settings(), dry_run=False
+            ImportKind.SHIFT_EXECUTIONS,
+            scenario,
+            run,
+            _settings(private_key_path),
+            BackfillOptions(dry_run=False),
         )
 
     assert summary.rows_accepted == len(run.observed.shift_executions)
@@ -93,13 +102,16 @@ def test_real_run_sends_every_shift_with_a_contract_status(
         assert (row["actual_start"] is None) == (row["status"] == ShiftOutcome.NOT_EXECUTED)
 
 
-def test_cli_dry_run_for_shift_executions(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_dry_run_for_shift_executions(
+    monkeypatch: pytest.MonkeyPatch, private_key_path: Path
+) -> None:
     monkeypatch.setenv("CAUDAL_SIM_API_BASE_URL", BASE_URL)
     monkeypatch.setenv("CAUDAL_SIM_API_USERNAME", "project.team")
     monkeypatch.setenv("CAUDAL_SIM_API_PASSWORD", "contraseña-de-prueba-larga")
     monkeypatch.setenv("CAUDAL_SIM_DEMO_AQUEDUCT_SLUG", SLUG)
     monkeypatch.setenv("CAUDAL_SIM_AQUEDUCT_ID", "0190f3a2-0000-7000-8000-0000000000bb")
     monkeypatch.setenv("CAUDAL_SIM_TANK_ID", "0190f3a2-2222-7000-8000-000000000001")
+    monkeypatch.setenv("CAUDAL_SIM_PRIVATE_KEY_PATH", str(private_key_path))
 
     result = CliRunner().invoke(app, ["backfill", "shift-executions", "--days", "2", "--dry-run"])
 

@@ -8,11 +8,15 @@ recognised by the backend. Dry runs build and count the batches and send nothing
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 from uuid import UUID
+
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from caudal_sim import __version__
 from caudal_sim.api_client import (
@@ -27,6 +31,12 @@ from caudal_sim.api_payload import ApiPayloadAdapter, ImportContext, ImportPaylo
 from caudal_sim.config import SimulatorSettings
 from caudal_sim.demo_guard import DemoTargetGuard
 from caudal_sim.scenario import Scenario
+from caudal_sim.signing import (
+    SIGNATURE_SUFFIX,
+    load_private_key,
+    public_key_fingerprint,
+    sign_bytes,
+)
 from caudal_sim.terrain import SimulationRun
 
 MAX_IMPORT_ROWS = 5000
@@ -37,6 +47,9 @@ PLACEHOLDER_SHA256 = "0" * SHA256_HEX_LENGTH
 ROWS_KEY = "rows"
 ROWS_ACCEPTED_KEY = "rows_accepted"
 ROWS_REJECTED_KEY = "rows_rejected"
+DEFAULT_MANIFEST_DIR = Path("outputs") / "imports"
+MANIFEST_SUFFIX = "-manifest.json"
+MANIFEST_INDENT = 2
 
 
 class ImportKind(StrEnum):
@@ -78,6 +91,25 @@ class BatchMetadata:
 
 
 @dataclass(frozen=True)
+class BackfillOptions:
+    """How a backfill runs: a dry run only counts; a real run signs and sends."""
+
+    dry_run: bool = False
+    manifest_dir: Path = DEFAULT_MANIFEST_DIR
+
+
+@dataclass(frozen=True)
+class ImportPlan:
+    """Everything a manifest records about one backfill, before anything is sent."""
+
+    kind: ImportKind
+    metadata: BatchMetadata
+    batches: tuple[ImportBatch, ...]
+    rows_total: int
+    duplicates_skipped: int
+
+
+@dataclass(frozen=True)
 class BackfillSummary:
     """What a backfill did, or would do in a dry run."""
 
@@ -88,6 +120,7 @@ class BackfillSummary:
     rows_accepted: int
     rows_rejected: int
     dry_run: bool
+    manifest_path: Path | None
 
 
 def build_batches(
@@ -137,12 +170,12 @@ def run_backfill(
     scenario: Scenario,
     run: SimulationRun,
     settings: SimulatorSettings,
-    *,
-    dry_run: bool,
+    options: BackfillOptions | None = None,
 ) -> BackfillSummary:
-    """Builds the batches for `kind` and, unless `dry_run`, checks the demo target and sends them.
+    """Builds the batches for `kind` and, unless `dry_run`, signs a manifest and sends them.
 
-    The dry run never contacts the API, so it does not check the demo target or log in.
+    The dry run never contacts the API, never reads the signing key and writes nothing. A real
+    run checks the demo target first and signs the manifest before logging in.
     """
     context = ImportContext(
         aqueduct_id=settings.aqueduct_id,
@@ -159,34 +192,91 @@ def run_backfill(
     )
     batches = build_batches(path, rows, metadata)
 
-    accepted = 0
-    rejected = 0
-    if not dry_run:
-        accepted, rejected = _send(batches, settings)
+    options = options or BackfillOptions()
+    plan = ImportPlan(
+        kind=kind,
+        metadata=metadata,
+        batches=batches,
+        rows_total=len(rows),
+        duplicates_skipped=duplicates,
+    )
+    if options.dry_run:
+        return BackfillSummary(
+            kind=kind,
+            rows_total=plan.rows_total,
+            duplicates_skipped=duplicates,
+            batches=len(batches),
+            rows_accepted=0,
+            rows_rejected=0,
+            dry_run=True,
+            manifest_path=None,
+        )
+    accepted, rejected, manifest_path = _send(plan, settings, options.manifest_dir)
     return BackfillSummary(
         kind=kind,
-        rows_total=len(rows),
+        rows_total=plan.rows_total,
         duplicates_skipped=duplicates,
         batches=len(batches),
         rows_accepted=accepted,
         rows_rejected=rejected,
-        dry_run=dry_run,
+        dry_run=False,
+        manifest_path=manifest_path,
     )
 
 
-def _send(batches: Sequence[ImportBatch], settings: SimulatorSettings) -> tuple[int, int]:
+def _write_signed_manifest(plan: ImportPlan, manifest_dir: Path, key: Ed25519PrivateKey) -> Path:
+    """Writes the manifest of the batches and its Ed25519 signature next to it.
+
+    The manifest holds hashes and counts only. The private key never enters the file.
+    """
+    metadata = plan.metadata
+    manifest: dict[str, Any] = {
+        "is_simulated": True,
+        "kind": plan.kind.value,
+        "aqueduct_id": str(metadata.aqueduct_id),
+        "scenario_name": metadata.scenario_name,
+        "seed": metadata.seed,
+        "simulator_version": __version__,
+        "rows_total": plan.rows_total,
+        "duplicates_skipped": plan.duplicates_skipped,
+        "signing_key_fingerprint": public_key_fingerprint(key),
+        "batches": [
+            {"path": batch.path, "row_count": batch.row_count, "file_sha256": batch.file_sha256}
+            for batch in plan.batches
+        ],
+    }
+    data = (
+        json.dumps(manifest, indent=MANIFEST_INDENT, ensure_ascii=False, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = manifest_dir / f"{plan.kind.value}{MANIFEST_SUFFIX}"
+    manifest_path.write_bytes(data)
+    signature_path = manifest_path.with_name(manifest_path.name + SIGNATURE_SUFFIX)
+    signature_path.write_text(sign_bytes(data, key) + "\n", encoding="ascii")
+    return manifest_path
+
+
+def _send(
+    plan: ImportPlan, settings: SimulatorSettings, manifest_dir: Path
+) -> tuple[int, int, Path]:
+    """Checks the demo target, signs the manifest, then logs in and sends every batch.
+
+    The order matters: nothing is signed or sent for a target that is not the demo aqueduct.
+    """
     accepted = 0
     rejected = 0
     with CaudalApiClient(
         settings.api_base_url, timeout_seconds=settings.http_timeout_seconds
     ) as client:
         DemoTargetGuard(client, settings.demo_aqueduct_slug).ensure_demo()
+        key = load_private_key(settings.private_key_path)
+        manifest_path = _write_signed_manifest(plan, manifest_dir, key)
         client.login(settings.api_username, settings.api_password)
-        for batch in batches:
+        for batch in plan.batches:
             response = client.post_import(batch.path, batch.body)
             accepted += _count(response, ROWS_ACCEPTED_KEY)
             rejected += _count(response, ROWS_REJECTED_KEY)
-    return accepted, rejected
+    return accepted, rejected, manifest_path
 
 
 def _count(response: Mapping[str, Any], key: str) -> int:
