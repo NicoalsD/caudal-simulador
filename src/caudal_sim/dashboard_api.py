@@ -8,10 +8,12 @@ responses carry simulated data only: no usernames, tokens, keys or personal data
 from __future__ import annotations
 
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from caudal_sim import __version__
@@ -55,11 +57,21 @@ class StateOut(BaseModel):
     sensor_level_m: float | None = Field(
         default=None, description="Nivel que reporta el sensor simulado, en metros."
     )
+    gauge_min_m: float | None = Field(
+        default=None, description="Mínimo de la regla pintada del tanque, en metros."
+    )
+    gauge_max_m: float | None = Field(
+        default=None, description="Máximo de la regla pintada del tanque, en metros."
+    )
     valves: list[ValveOut] = Field(description="Válvulas de la simulación y su estado.")
 
 
-def create_dashboard_app(session: DashboardSession) -> FastAPI:
-    """Builds the API over one dashboard session. The session is shared, not copied."""
+def create_dashboard_app(session: DashboardSession, static_dir: Path | None = None) -> FastAPI:
+    """Builds the API over one dashboard session. The session is shared, not copied.
+
+    When `static_dir` holds the built dashboard, it is served from the same origin, after the
+    API routes, so `/api` always answers first.
+    """
     app = FastAPI(
         title=API_TITLE,
         version=__version__,
@@ -84,6 +96,8 @@ def create_dashboard_app(session: DashboardSession) -> FastAPI:
             updated_at=snapshot.updated_at,
             tank_level_m=snapshot.tank_level_m,
             sensor_level_m=snapshot.sensor_level_m,
+            gauge_min_m=snapshot.gauge_min_m,
+            gauge_max_m=snapshot.gauge_max_m,
             valves=[
                 ValveOut(id=valve.valve_id, label=valve.label, status=valve.status)
                 for valve in snapshot.valves
@@ -117,4 +131,6 @@ def create_dashboard_app(session: DashboardSession) -> FastAPI:
         )
         return StreamingResponse(frames, media_type=SSE_CONTENT_TYPE, headers=NO_CACHE_HEADER)
 
+    if static_dir is not None and static_dir.is_dir():
+        app.mount("/", StaticFiles(directory=static_dir, html=True), name="tablero")
     return app

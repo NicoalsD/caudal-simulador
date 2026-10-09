@@ -21,6 +21,8 @@ AT = datetime(2026, 1, 1, 6, 0, tzinfo=UTC)
 HTTP_OK = 200
 TANK_LEVEL_M = 3.4
 SENSOR_LEVEL_M = 3.41
+GAUGE_MIN_M = 0.0
+GAUGE_MAX_M = 5.0
 ALLOWED_STATE_KEYS = {
     "scenario",
     "simulated",
@@ -28,6 +30,8 @@ ALLOWED_STATE_KEYS = {
     "updated_at",
     "tank_level_m",
     "sensor_level_m",
+    "gauge_min_m",
+    "gauge_max_m",
     "valves",
 }
 
@@ -40,6 +44,7 @@ def _session() -> DashboardSession:
     session = DashboardSession(scenario=SCENARIO)
     session.register_valve(VALVE_ID, VALVE_LABEL)
     session.set_levels(AT, TANK_LEVEL_M, SENSOR_LEVEL_M)
+    session.set_gauge_rule(GAUGE_MIN_M, GAUGE_MAX_M)
     return session
 
 
@@ -54,6 +59,8 @@ def test_state_reports_simulated_levels_and_valves() -> None:
     assert body["scenario"] == SCENARIO
     assert body["tank_level_m"] == TANK_LEVEL_M
     assert body["sensor_level_m"] == SENSOR_LEVEL_M
+    assert body["gauge_min_m"] == GAUGE_MIN_M
+    assert body["gauge_max_m"] == GAUGE_MAX_M
     assert body["valves"] == [{"id": VALVE_ID, "label": VALVE_LABEL, "status": "CLOSED"}]
 
 
@@ -136,3 +143,15 @@ def test_tablero_command_warns_when_it_is_exposed(
     assert exposed.exit_code == 0
     assert served["host"] == "0.0.0.0"
     assert "fuera de este equipo" in exposed.output
+
+
+def test_built_dashboard_is_served_from_the_same_origin_and_api_wins(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<!doctype html><title>Tablero</title>", encoding="utf-8")
+    client = TestClient(create_dashboard_app(_session(), static_dir=tmp_path))
+
+    page = client.get("/")
+    state = client.get(STATE_PATH)
+
+    assert page.status_code == HTTP_OK
+    assert "Tablero" in page.text
+    assert state.json()["simulated"] is True

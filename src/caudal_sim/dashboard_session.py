@@ -31,6 +31,8 @@ class DashboardSnapshot:
     updated_at: datetime | None
     tank_level_m: float | None
     sensor_level_m: float | None
+    gauge_min_m: float | None
+    gauge_max_m: float | None
     valves: tuple[ValveView, ...]
 
 
@@ -46,6 +48,8 @@ class DashboardSession:
         self._updated_at: datetime | None = None
         self._tank_level_m: float | None = None
         self._sensor_level_m: float | None = None
+        self._gauge_min_m: float | None = None
+        self._gauge_max_m: float | None = None
         self._valves: dict[str, ValveView] = {}
         self._bus.subscribe(self)
 
@@ -57,6 +61,13 @@ class DashboardSession:
     def register_valve(self, valve_id: str, label: str) -> None:
         """Adds a valve to the dashboard, closed until the simulation says otherwise."""
         self._valves[valve_id] = ValveView(valve_id=valve_id, label=label, status="CLOSED")
+
+    def set_gauge_rule(self, gauge_min_m: float, gauge_max_m: float) -> None:
+        """Records the painted gauge of the tank, so that the dashboard can draw the level."""
+        if gauge_min_m >= gauge_max_m:
+            raise ValueError("la regla del tanque debe tener un mínimo menor que el máximo")
+        self._gauge_min_m = gauge_min_m
+        self._gauge_max_m = gauge_max_m
 
     def set_levels(self, at: datetime, tank_level_m: float, sensor_level_m: float | None) -> None:
         """Records the true tank level and the level that the sensor reports at `at`."""
@@ -71,6 +82,8 @@ class DashboardSession:
             updated_at=self._updated_at,
             tank_level_m=self._tank_level_m,
             sensor_level_m=self._sensor_level_m,
+            gauge_min_m=self._gauge_min_m,
+            gauge_max_m=self._gauge_max_m,
             valves=tuple(self._valves.values()),
         )
 

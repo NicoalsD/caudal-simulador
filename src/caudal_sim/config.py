@@ -50,6 +50,7 @@ DEFAULT_DASHBOARD_PORT = 8000
 MIN_PORT = 1
 MAX_PORT = 65535
 DASHBOARD_ENV_PREFIX = "CAUDAL_SIM_DASHBOARD_"
+DEFAULT_DASHBOARD_STATIC_DIR = Path("dashboard") / "dist"
 
 
 class DashboardSettings(BaseSettings):
@@ -67,3 +68,7 @@ class DashboardSettings(BaseSettings):
 
     host: str = Field(default=DEFAULT_DASHBOARD_HOST, min_length=1)
     port: int = Field(default=DEFAULT_DASHBOARD_PORT, ge=MIN_PORT, le=MAX_PORT)
+    static_dir: Path = Field(
+        default=DEFAULT_DASHBOARD_STATIC_DIR,
+        description="Built dashboard (dashboard/dist). Served by the API when it exists.",
+    )

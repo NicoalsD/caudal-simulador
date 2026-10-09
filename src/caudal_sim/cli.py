@@ -108,7 +108,8 @@ def tablero(
         )
     typer.echo(f"Tablero del simulador en http://{bind_host}:{bind_port} (Swagger en /docs).")
     session = DashboardSession(scenario=NO_SIMULATION_NAME)
-    uvicorn.run(create_dashboard_app(session), host=bind_host, port=bind_port, log_level="warning")
+    app_instance = create_dashboard_app(session, settings.static_dir)
+    uvicorn.run(app_instance, host=bind_host, port=bind_port, log_level="warning")
 
 
 @app.command("export-actas")

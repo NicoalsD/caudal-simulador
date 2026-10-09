@@ -32,3 +32,35 @@ jobs:
 
       - name: Ejecuta las pruebas
         run: uv run pytest
+
+  tablero:
+    name: Tablero (lint, tipos, pruebas y build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6.1.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: dashboard/pnpm-lock.yaml
+
+      - name: Instala dependencias bloqueadas
+        run: pnpm install --frozen-lockfile
+
+      - name: Valida reglas de estilo y de seguridad
+        run: pnpm lint
+
+      - name: Valida tipos
+        run: pnpm typecheck
+
+      - name: Ejecuta las pruebas
+        run: pnpm test --run
+
+      - name: Construye el tablero
+        run: pnpm build
