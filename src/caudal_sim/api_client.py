@@ -7,6 +7,7 @@ into `ApiError`, which carries the contract code and the Spanish message.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from types import TracebackType
 from typing import Any, Self
@@ -19,10 +20,12 @@ PUBLIC_SCHEDULE_PATH = "/api/v1/public/{slug}/schedule"
 AUTHORIZATION_HEADER = "Authorization"
 BEARER_PREFIX = "Bearer "
 JSON_CONTENT_TYPE = "application/json"
+CONTENT_TYPE_HEADER = "Content-Type"
 ERROR_KEY = "error"
 UNEXPECTED_ERROR_CODE = "UNEXPECTED_RESPONSE"
 UNEXPECTED_ERROR_MESSAGE = "La API devolvió una respuesta inesperada."
 UNKNOWN_STATUS = 0
+JSON_SEPARATORS = (",", ":")
 
 
 class ApiError(Exception):
@@ -77,7 +80,7 @@ class CaudalApiClient:
         body = self._request(
             "POST",
             LOGIN_PATH,
-            json={"username": username, "password": password.get_secret_value()},
+            body={"username": username, "password": password.get_secret_value()},
         )
         token = body.get("access_token")
         if not isinstance(token, str) or not token:
@@ -95,7 +98,7 @@ class CaudalApiClient:
         return self._request(
             "POST",
             path,
-            json=body,
+            body=body,
             headers={AUTHORIZATION_HEADER: f"{BEARER_PREFIX}{self._token}"},
         )
 
@@ -104,11 +107,16 @@ class CaudalApiClient:
         method: str,
         path: str,
         *,
-        json: Mapping[str, Any] | None = None,
+        body: Mapping[str, Any] | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> Mapping[str, Any]:
+        request_headers = dict(headers or {})
+        content: bytes | None = None
+        if body is not None:
+            content = encode_json(body)
+            request_headers[CONTENT_TYPE_HEADER] = JSON_CONTENT_TYPE
         try:
-            response = self._http.request(method, path, json=json, headers=headers)
+            response = self._http.request(method, path, content=content, headers=request_headers)
         except httpx.HTTPError as error:
             raise ApiError(
                 UNKNOWN_STATUS,
@@ -118,6 +126,13 @@ class CaudalApiClient:
         if response.is_success:
             return _json_object(response)
         raise _error_from(response)
+
+
+def encode_json(body: Mapping[str, Any]) -> bytes:
+    """Canonical UTF-8 JSON: sorted keys, no extra spaces, so that its size is predictable."""
+    return json.dumps(
+        body, ensure_ascii=False, sort_keys=True, separators=JSON_SEPARATORS, allow_nan=False
+    ).encode("utf-8")
 
 
 def _json_object(response: httpx.Response) -> Mapping[str, Any]:
