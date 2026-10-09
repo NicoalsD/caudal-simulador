@@ -128,3 +128,25 @@ readings:
   # Maximum delay of a reading sent without signal, in hours (uniform draw from 1 to the maximum).
   # Assumption, verify with the village's coverage.
   max_delay_hours: 12
+
+devices:
+  valve:
+    # Seconds the motor takes to go from one limit switch to the other. Assumption, verify with the motor datasheet.
+    travel_seconds: 15
+    # Seconds after which the firmware stops the motor and reports FAILED. Assumption, verify with the valve datasheet.
+    max_travel_seconds: 60
+  sensor:
+    # Standard deviation of the sensor noise (ADS1115 quantization), in meters. Assumption, verify with the sensor datasheet.
+    noise_sd_m: 0.01
+    # Linear drift in meters per day, counted from drift_start_hour. Assumption, verify with the sensor datasheet.
+    drift_m_per_day: 0.0005
+    # Hour of the simulation (from the start) when the drift begins. Assumption, verify.
+    drift_start_hour: 0
+    # Window in which the sensor keeps its last value, in hours from the start. Assumption, verify with the failure history.
+    stuck_from_hour: 1000
+    stuck_until_hour: 1012
+  buffer:
+    # Telemetry batches the node keeps while there is no signal. Assumption, verify with the node's memory.
+    capacity_batches: 500
+    # Passes of the retry loop before the batches wait for the next connection. Assumption, verify.
+    max_attempts: 5

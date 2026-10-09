@@ -210,6 +210,58 @@ class ReadingSpec(BaseModel):
         return self
 
 
+class ValveSpec(BaseModel):
+    """Motorized valve: motor travel time and the time after which the motor is stopped."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    travel_seconds: float = Field(gt=0)
+    max_travel_seconds: float = Field(gt=0)
+
+    @model_validator(mode="after")
+    def _max_travel_covers_the_travel(self) -> Self:
+        if self.max_travel_seconds < self.travel_seconds:
+            raise ValueError("max_travel_seconds no puede ser menor que travel_seconds")
+        return self
+
+
+class SensorSpec(BaseModel):
+    """Level sensor faults: noise, linear drift from a start hour, and a stuck window."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    noise_sd_m: float = Field(ge=0)
+    drift_m_per_day: float
+    drift_start_hour: int = Field(ge=0)
+    stuck_from_hour: int = Field(ge=0)
+    stuck_until_hour: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def _stuck_window_is_forward(self) -> Self:
+        if self.stuck_until_hour <= self.stuck_from_hour:
+            raise ValueError("stuck_until_hour debe ser mayor que stuck_from_hour")
+        return self
+
+
+class BufferSpec(BaseModel):
+    """Offline buffer of a node: batches it can keep and passes of its retry loop."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    capacity_batches: int = Field(ge=1)
+    max_attempts: int = Field(ge=1)
+
+
+class DevicesSpec(BaseModel):
+    """Parameters of the simulated field devices. Every value comes from the scenario."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    valve: ValveSpec
+    sensor: SensorSpec
+    buffer: BufferSpec
+
+
 class Scenario(BaseModel):
     """Complete validated scenario. Immutable once built."""
 
@@ -224,6 +276,7 @@ class Scenario(BaseModel):
     schedule: ScheduleSpec
     leaks: LeakSpec
     readings: ReadingSpec
+    devices: DevicesSpec
 
     @model_validator(mode="after")
     def _sector_references_are_valid(self) -> Self:

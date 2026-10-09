@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from caudal_sim.actuator_driver import SimulatedMotorDriver
 from caudal_sim.device_kit import DeviceKit, DeviceKitFactory, FieldKitFactory
-from caudal_sim.sensors import Sensor
+from caudal_sim.sensors import Sensor, SourceSensor
 from caudal_sim.valve_actuator import Actuator, ValveActuator
 from caudal_sim.valve_state import ValveStatus
 
@@ -19,7 +19,7 @@ def _tank_level(_at: datetime) -> float:
 
 
 def _field_factory() -> FieldKitFactory:
-    return FieldKitFactory(_tank_level, TRAVEL_TIME, MAX_TRAVEL_TIME)
+    return FieldKitFactory(lambda: SourceSensor(_tank_level), TRAVEL_TIME, MAX_TRAVEL_TIME)
 
 
 def test_kit_holds_a_sensor_and_an_actuator_from_the_same_family() -> None:
