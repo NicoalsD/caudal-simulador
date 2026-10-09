@@ -2,34 +2,44 @@
 
 from __future__ import annotations
 
+import time
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
 import uvicorn
-from pydantic import ValidationError
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pydantic import SecretStr, ValidationError
 
 from caudal_sim import __version__
-from caudal_sim.api_client import ApiError
+from caudal_sim.api_client import ApiError, CaudalApiClient
+from caudal_sim.api_payload import ApiPayloadAdapter, ImportContext
 from caudal_sim.backfill import BackfillOptions, ImportKind, ImportLimitError, run_backfill
 from caudal_sim.backtest import export_backtest_windows
 from caudal_sim.builder import ScenarioBuilder
 from caudal_sim.config import (
     DEFAULT_DASHBOARD_PORT,
     ENV_PREFIX,
+    LIVE_ENV_PREFIX,
     MAX_PORT,
+    MIN_HOURS,
     MIN_PORT,
     DashboardSettings,
+    LiveSettings,
     SimulatorSettings,
 )
-from caudal_sim.dashboard_api import create_dashboard_app
+from caudal_sim.dashboard_api import DashboardServer, create_dashboard_app
 from caudal_sim.dashboard_session import DashboardSession
-from caudal_sim.demo_guard import NonDemoTargetError
+from caudal_sim.demo_guard import DemoTargetGuard, NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
+from caudal_sim.live import LiveAbortedError, LiveOptions, LiveRunner, LiveWiring, NetworkGate
 from caudal_sim.minutes_export import export_confirmed_executions
+from caudal_sim.offline_buffer import OfflineBufferTransport
 from caudal_sim.scenario import Scenario, ScenarioError
-from caudal_sim.signing import SigningKeyError
+from caudal_sim.signing import SigningKeyError, load_private_key
+from caudal_sim.telemetry_transport import DeviceIdentity, SignedHttpTransport
 from caudal_sim.terrain import run_simulation
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
@@ -44,6 +54,8 @@ DEFAULT_OUTPUT = Path("outputs")
 EXIT_SCENARIO_ERROR = 1
 EXIT_CONFIG_ERROR = 2
 EXIT_IMPORT_ERROR = 3
+EXIT_LIVE_ERROR = 4
+DEFAULT_LIVE_DAYS = 1
 DEFAULT_BACKFILL_DAYS = 90
 
 
@@ -110,6 +122,199 @@ def tablero(
     session = DashboardSession(scenario=NO_SIMULATION_NAME)
     app_instance = create_dashboard_app(session, settings.static_dir)
     uvicorn.run(app_instance, host=bind_host, port=bind_port, log_level="warning")
+
+
+@app.command()
+def live(  # noqa: PLR0913 - each parameter is one option that Typer reads from the signature
+    *,
+    scenario: Annotated[
+        str,
+        typer.Option(help="Nombre del escenario (scenarios/<nombre>.yaml) o ruta a un archivo."),
+    ] = DEFAULT_SCENARIO,
+    days: Annotated[
+        int,
+        typer.Option(help="Días simulados a reproducir.", min=MIN_DAYS),
+    ] = DEFAULT_LIVE_DAYS,
+    seed: Annotated[
+        int | None,
+        typer.Option(help="Semilla. Por defecto, la del escenario."),
+    ] = None,
+    max_hours: Annotated[
+        int | None,
+        typer.Option(help="Detiene la corrida tras estas horas simuladas.", min=MIN_HOURS),
+    ] = None,
+    auto_junta: Annotated[
+        bool,
+        typer.Option(
+            "--auto-junta",
+            help="Aprueba las propuestas pendientes con la Junta simulada. Solo corridas largas.",
+        ),
+    ] = False,
+    dashboard: Annotated[
+        bool,
+        typer.Option("--tablero/--sin-tablero", help="Levanta el tablero junto a la simulación."),
+    ] = True,
+) -> None:
+    """Simula el acueducto en tiempo real y envía sus datos al acueducto demo por la API."""
+    resolved = _resolve_scenario(scenario, seed)
+    settings = _settings_or_exit()
+    live_settings = _live_settings_or_exit()
+    board_settings = _board_settings_or_exit(live_settings, auto_junta)
+    key = _load_key_or_exit(settings.private_key_path)
+    run = run_simulation(resolved, days, resolved.meta.default_seed)
+    session = DashboardSession(scenario=resolved.meta.name)
+    with CaudalApiClient(
+        settings.api_base_url, timeout_seconds=settings.http_timeout_seconds
+    ) as api:
+        _guard_demo_or_exit(api, settings.demo_aqueduct_slug)
+        _login_or_exit(api, live_settings.operator_username, live_settings.operator_password)
+        board = _board_client_or_none(settings, board_settings)
+        with httpx.Client(
+            base_url=settings.api_base_url, timeout=settings.http_timeout_seconds
+        ) as telemetry_http:
+            signed = SignedHttpTransport(
+                telemetry_http, DeviceIdentity(live_settings.device_id, key)
+            )
+            gate = NetworkGate(signed)
+            telemetry = OfflineBufferTransport.from_spec(
+                gate, resolved.devices.buffer, sleeper=time.sleep
+            )
+            adapter = ApiPayloadAdapter(
+                ImportContext(
+                    aqueduct_id=settings.aqueduct_id,
+                    tank_id=settings.tank_id,
+                    start=run.start,
+                    sector_slugs=tuple(sector.id for sector in resolved.sectors),
+                )
+            )
+            wiring = LiveWiring(
+                scenario=resolved,
+                run=run,
+                session=session,
+                telemetry=telemetry,
+                gate=gate,
+                api=api,
+                adapter=adapter,
+                device_id=live_settings.device_id,
+                sleeper=time.sleep,
+                board=board,
+            )
+            options = LiveOptions(
+                hour_seconds=live_settings.hour_seconds,
+                max_hours=max_hours,
+                auto_junta=auto_junta,
+            )
+            _run_live(wiring, options, session, dashboard)
+    if board is not None:
+        board.close()
+
+
+def _run_live(
+    wiring: LiveWiring,
+    options: LiveOptions,
+    session: DashboardSession,
+    dashboard: bool,
+) -> None:
+    server: DashboardServer | None = None
+    if dashboard:
+        dashboard_settings = DashboardSettings()
+        server = DashboardServer(
+            create_dashboard_app(session, dashboard_settings.static_dir),
+            host=dashboard_settings.host,
+            port=dashboard_settings.port,
+        )
+        server.start()
+        typer.echo(
+            f"Tablero en http://{dashboard_settings.host}:{dashboard_settings.port} "
+            "(datos simulados)."
+        )
+    try:
+        report = LiveRunner(wiring, options).run()
+    except LiveAbortedError as error:
+        typer.echo(f"Error: {error.message}", err=True)
+        raise typer.Exit(code=EXIT_LIVE_ERROR) from error
+    finally:
+        if server is not None:
+            server.stop()
+    typer.echo(
+        f"Simulación en vivo: {report.hours} horas, {report.readings_sent} lecturas enviadas, "
+        f"{report.readings_rejected} rechazadas, {report.approvals} aprobaciones, "
+        f"{wiring.telemetry.pending} lotes de telemetría pendientes."
+    )
+    for message in report.messages:
+        typer.echo(message)
+    if report.unsupported_controls:
+        typer.echo(
+            "Condiciones pedidas en el tablero que este motor todavía no aplica: "
+            + ", ".join(report.unsupported_controls)
+        )
+
+
+def _live_settings_or_exit() -> LiveSettings:
+    try:
+        return LiveSettings()
+    except ValidationError as error:
+        names = sorted(
+            {f"{LIVE_ENV_PREFIX}{str(item['loc'][0]).upper()}" for item in error.errors()}
+        )
+        typer.echo(
+            "Error: faltan o son inválidas estas variables de entorno (revisa .env): "
+            + ", ".join(names),
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_CONFIG_ERROR) from error
+
+
+def _board_settings_or_exit(live_settings: LiveSettings, auto_junta: bool) -> LiveSettings | None:
+    if not auto_junta:
+        return None
+    if live_settings.board_username is None or live_settings.board_password is None:
+        typer.echo(
+            "Error: --auto-junta necesita CAUDAL_SIM_LIVE_BOARD_USERNAME y "
+            "CAUDAL_SIM_LIVE_BOARD_PASSWORD en .env.",
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_CONFIG_ERROR)
+    return live_settings
+
+
+def _board_client_or_none(
+    settings: SimulatorSettings, board_settings: LiveSettings | None
+) -> CaudalApiClient | None:
+    if board_settings is None or board_settings.board_username is None:
+        return None
+    client = CaudalApiClient(settings.api_base_url, timeout_seconds=settings.http_timeout_seconds)
+    if board_settings.board_password is None:
+        raise typer.Exit(code=EXIT_CONFIG_ERROR)
+    _login_or_exit(client, board_settings.board_username, board_settings.board_password)
+    return client
+
+
+def _guard_demo_or_exit(api: CaudalApiClient, slug: str) -> None:
+    try:
+        DemoTargetGuard(api, slug).ensure_demo()
+    except NonDemoTargetError as error:
+        typer.echo(f"Error: {error.message}", err=True)
+        raise typer.Exit(code=EXIT_LIVE_ERROR) from error
+    except ApiError as error:
+        typer.echo(f"Error: {error.message}", err=True)
+        raise typer.Exit(code=EXIT_LIVE_ERROR) from error
+
+
+def _login_or_exit(api: CaudalApiClient, username: str, password: SecretStr) -> None:
+    try:
+        api.login(username, password)
+    except ApiError as error:
+        typer.echo(f"Error: no se pudo iniciar sesión en la API ({error.code}).", err=True)
+        raise typer.Exit(code=EXIT_LIVE_ERROR) from error
+
+
+def _load_key_or_exit(path: Path) -> Ed25519PrivateKey:
+    try:
+        return load_private_key(path)
+    except SigningKeyError as error:
+        typer.echo(f"Error: {error.message}", err=True)
+        raise typer.Exit(code=EXIT_CONFIG_ERROR) from error
 
 
 @app.command("export-actas")

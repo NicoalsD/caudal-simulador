@@ -17,6 +17,9 @@ from pydantic import SecretStr
 
 LOGIN_PATH = "/api/v1/auth/login"
 PUBLIC_SCHEDULE_PATH = "/api/v1/public/{slug}/schedule"
+READINGS_PATH = "/api/v1/readings"
+PROPOSALS_PATH = "/api/v1/schedule-proposals"
+PENDING_REVIEW_STATUS = "PENDING_REVIEW"
 AUTHORIZATION_HEADER = "Authorization"
 BEARER_PREFIX = "Bearer "
 JSON_CONTENT_TYPE = "application/json"
@@ -93,10 +96,35 @@ class CaudalApiClient:
 
     def post_import(self, path: str, body: Mapping[str, Any]) -> Mapping[str, Any]:
         """Sends one import batch. Requires a prior successful `login`."""
+        return self._authorized("POST", path, body=body)
+
+    def post_reading(self, body: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Creates one tank reading as the logged-in user. Requires a prior `login`."""
+        return self._authorized("POST", READINGS_PATH, body=body)
+
+    def list_pending_proposals(self) -> list[Mapping[str, Any]]:
+        """Shift proposals waiting for a decision. Requires a prior `login` as the board."""
+        page = self._authorized("GET", f"{PROPOSALS_PATH}?status={PENDING_REVIEW_STATUS}")
+        items = page.get("items")
+        if not isinstance(items, list):
+            raise ApiError(UNKNOWN_STATUS, UNEXPECTED_ERROR_CODE, UNEXPECTED_ERROR_MESSAGE)
+        return [item for item in items if isinstance(item, dict)]
+
+    def approve_proposal(self, proposal_id: str, lock_version: int) -> Mapping[str, Any]:
+        """Approves a proposal as the board. The `lock_version` must match the proposal's."""
+        return self._authorized(
+            "POST",
+            f"{PROPOSALS_PATH}/{proposal_id}/approve",
+            body={"lock_version": lock_version},
+        )
+
+    def _authorized(
+        self, method: str, path: str, *, body: Mapping[str, Any] | None = None
+    ) -> Mapping[str, Any]:
         if self._token is None:
             raise ApiError(UNKNOWN_STATUS, "UNAUTHORIZED", "Primero inicia sesión en la API.")
         return self._request(
-            "POST",
+            method,
             path,
             body=body,
             headers={AUTHORIZATION_HEADER: f"{BEARER_PREFIX}{self._token}"},

@@ -7,10 +7,12 @@ responses carry simulated data only: no usernames, tokens, keys or personal data
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
+import uvicorn
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +32,7 @@ SIMULATED_NOTICE = "Datos simulados"
 STATE_PATH = "/api/tablero/estado"
 HTTP_ACCEPTED = 202
 HTTP_UNPROCESSABLE = 422
+SERVER_STOP_TIMEOUT_SECONDS = 5.0
 EVENTS_PATH = "/api/tablero/eventos"
 CONTROLS_PATH = "/api/tablero/controles"
 NO_CACHE_HEADER = {"Cache-Control": "no-cache"}
@@ -197,3 +200,24 @@ def create_dashboard_app(session: DashboardSession, static_dir: Path | None = No
     if static_dir is not None and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="tablero")
     return app
+
+
+class DashboardServer:
+    """Runs the dashboard API in a background thread, next to the simulation that feeds it."""
+
+    def __init__(self, app: FastAPI, *, host: str, port: int) -> None:
+        self._server = uvicorn.Server(
+            uvicorn.Config(app, host=host, port=port, log_level="warning")
+        )
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Starts serving. Returns at once; the requests are answered by the thread."""
+        self._thread = threading.Thread(target=self._server.run, name="tablero", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Asks the server to stop and waits for its thread to finish."""
+        self._server.should_exit = True
+        if self._thread is not None:
+            self._thread.join(timeout=SERVER_STOP_TIMEOUT_SECONDS)
