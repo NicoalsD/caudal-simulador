@@ -32,16 +32,18 @@ climate:
   # Supuesto, verificar con datos del IDEAM o de una estación cercana.
   # p_wet_after_dry: probabilidad de que un día seco sea húmedo (llueva).
   # p_wet_after_wet: probabilidad de que un día húmedo siga húmedo.
+  # gamma_shape y gamma_scale_mm: lluvia de un día húmedo (mm), distribución gamma.
+  # Supuesto, verificar con pluviómetro local.
   monthly:
-    - {month: 1, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
-    - {month: 2, p_wet_after_dry: 0.30, p_wet_after_wet: 0.50}
-    - {month: 3, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60}
-    - {month: 4, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
-    - {month: 5, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
-    - {month: 6, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55}
-    - {month: 7, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
-    - {month: 8, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45}
-    - {month: 9, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55}
-    - {month: 10, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
-    - {month: 11, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70}
-    - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60}
+    - {month: 1, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45, gamma_shape: 0.8, gamma_scale_mm: 6.0}
+    - {month: 2, p_wet_after_dry: 0.30, p_wet_after_wet: 0.50, gamma_shape: 0.8, gamma_scale_mm: 7.0}
+    - {month: 3, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}
+    - {month: 4, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
+    - {month: 5, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
+    - {month: 6, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55, gamma_shape: 0.8, gamma_scale_mm: 6.0}
+    - {month: 7, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45, gamma_shape: 0.8, gamma_scale_mm: 5.0}
+    - {month: 8, p_wet_after_dry: 0.25, p_wet_after_wet: 0.45, gamma_shape: 0.8, gamma_scale_mm: 5.0}
+    - {month: 9, p_wet_after_dry: 0.35, p_wet_after_wet: 0.55, gamma_shape: 0.8, gamma_scale_mm: 7.0}
+    - {month: 10, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
+    - {month: 11, p_wet_after_dry: 0.55, p_wet_after_wet: 0.70, gamma_shape: 0.8, gamma_scale_mm: 9.0}
+    - {month: 12, p_wet_after_dry: 0.40, p_wet_after_wet: 0.60, gamma_shape: 0.8, gamma_scale_mm: 8.0}

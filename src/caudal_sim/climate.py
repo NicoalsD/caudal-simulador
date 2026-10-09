@@ -23,6 +23,19 @@ class WetDayModel(ABC):
         """Devuelve un valor por día: True si el día es húmedo."""
 
 
+class RainAmountModel(ABC):
+    """Interfaz (Strategy): cantidad de lluvia de cada día, en milímetros.
+
+    @pattern P19 Strategy
+    """
+
+    @abstractmethod
+    def amounts_mm(
+        self, wet: npt.NDArray[np.bool_], start: date, rng: np.random.Generator
+    ) -> npt.NDArray[np.float64]:
+        """Devuelve los milímetros de cada día. Los días secos valen cero."""
+
+
 class MonthlyMarkovClimate(WetDayModel):
     """Cadena de Markov de dos estados (seco y húmedo) con probabilidades por mes.
 
@@ -49,3 +62,27 @@ class MonthlyMarkovClimate(WetDayModel):
             previous_wet = bool(uniforms[index] < probability)
             wet[index] = previous_wet
         return wet
+
+
+class GammaRainfall(RainAmountModel):
+    """Lluvia de los días húmedos con distribución gamma, forma y escala por mes.
+
+    Se sortea un monto para todos los días y después se enmascara con los días secos.
+    Así, el flujo aleatorio no depende de qué días son húmedos.
+
+    @pattern P19 Strategy
+    """
+
+    def __init__(self, monthly: Sequence[MonthClimate]) -> None:
+        self._shape = np.ones(MONTHS_PER_YEAR + 1)
+        self._scale = np.ones(MONTHS_PER_YEAR + 1)
+        for row in monthly:
+            self._shape[row.month] = row.gamma_shape
+            self._scale[row.month] = row.gamma_scale_mm
+
+    def amounts_mm(
+        self, wet: npt.NDArray[np.bool_], start: date, rng: np.random.Generator
+    ) -> npt.NDArray[np.float64]:
+        months = np.array([(start + timedelta(days=i)).month for i in range(wet.shape[0])])
+        draws = rng.gamma(self._shape[months], self._scale[months])
+        return np.where(wet, draws, 0.0).astype(np.float64)

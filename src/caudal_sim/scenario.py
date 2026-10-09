@@ -63,13 +63,15 @@ MONTHS_PER_YEAR = 12
 
 
 class MonthClimate(BaseModel):
-    """Probabilidades de lluvia de un mes. Cada día húmedo o seco depende del día anterior."""
+    """Lluvia de un mes: probabilidades de día húmedo y forma y escala de la gamma (mm)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     month: int = Field(ge=1, le=MONTHS_PER_YEAR)
     p_wet_after_dry: float = Field(ge=0, le=1)
     p_wet_after_wet: float = Field(ge=0, le=1)
+    gamma_shape: float = Field(gt=0)
+    gamma_scale_mm: float = Field(gt=0)
 
 
 class ClimateSpec(BaseModel):

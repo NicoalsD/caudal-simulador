@@ -19,11 +19,22 @@ STATIONARY_TOLERANCE = 0.05
 PROBABILITY_BOUNDS = st.floats(min_value=0.05, max_value=0.95)
 
 
+RAIN_SHAPE = 0.8
+RAIN_SCALE_MM = 6.0
+
+
+def _row(month: int, p_after_dry: float, p_after_wet: float) -> MonthClimate:
+    return MonthClimate(
+        month=month,
+        p_wet_after_dry=p_after_dry,
+        p_wet_after_wet=p_after_wet,
+        gamma_shape=RAIN_SHAPE,
+        gamma_scale_mm=RAIN_SCALE_MM,
+    )
+
+
 def _constant_year(p_after_dry: float, p_after_wet: float) -> list[MonthClimate]:
-    return [
-        MonthClimate(month=month, p_wet_after_dry=p_after_dry, p_wet_after_wet=p_after_wet)
-        for month in range(1, MONTHS_PER_YEAR + 1)
-    ]
+    return [_row(month, p_after_dry, p_after_wet) for month in range(1, MONTHS_PER_YEAR + 1)]
 
 
 def test_same_seed_gives_the_same_wet_days() -> None:
@@ -54,11 +65,7 @@ def test_climate_with_certain_rain_is_wet_every_day() -> None:
 def test_probabilities_switch_with_the_calendar_month() -> None:
     # Enero nunca llueve; febrero siempre. Los días de enero no pueden ser húmedos.
     monthly = [
-        MonthClimate(
-            month=month,
-            p_wet_after_dry=1.0 if month == FEBRUARY else 0.0,
-            p_wet_after_wet=1.0 if month == FEBRUARY else 0.0,
-        )
+        _row(month, *((1.0, 1.0) if month == FEBRUARY else (0.0, 0.0)))
         for month in range(1, MONTHS_PER_YEAR + 1)
     ]
     model = MonthlyMarkovClimate(monthly)
@@ -85,4 +92,4 @@ def test_long_run_wet_fraction_approaches_the_stationary_value(
 
 def test_negative_probabilities_are_rejected_by_the_scenario_model() -> None:
     with pytest.raises(ValueError, match="greater than or equal to 0"):
-        MonthClimate(month=1, p_wet_after_dry=-0.1, p_wet_after_wet=0.5)
+        _row(1, -0.1, 0.5)
