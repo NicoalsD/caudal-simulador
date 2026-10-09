@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import uvicorn
 from pydantic import ValidationError
 
 from caudal_sim import __version__
@@ -14,13 +15,25 @@ from caudal_sim.api_client import ApiError
 from caudal_sim.backfill import BackfillOptions, ImportKind, ImportLimitError, run_backfill
 from caudal_sim.backtest import export_backtest_windows
 from caudal_sim.builder import ScenarioBuilder
-from caudal_sim.config import ENV_PREFIX, SimulatorSettings
+from caudal_sim.config import (
+    DEFAULT_DASHBOARD_PORT,
+    ENV_PREFIX,
+    MAX_PORT,
+    MIN_PORT,
+    DashboardSettings,
+    SimulatorSettings,
+)
+from caudal_sim.dashboard_api import create_dashboard_app
+from caudal_sim.dashboard_session import DashboardSession
 from caudal_sim.demo_guard import NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
 from caudal_sim.minutes_export import export_confirmed_executions
 from caudal_sim.scenario import Scenario, ScenarioError
 from caudal_sim.signing import SigningKeyError
 from caudal_sim.terrain import run_simulation
+
+LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+NO_SIMULATION_NAME = "sin simulación en curso"
 
 SCENARIOS_DIR = Path("scenarios")
 SCENARIO_SUFFIX = ".yaml"
@@ -69,6 +82,33 @@ def main() -> None:
 def version() -> None:
     """Muestra la versión del simulador."""
     typer.echo(f"caudal-sim {__version__}")
+
+
+@app.command()
+def tablero(
+    host: Annotated[
+        str | None,
+        typer.Option(help="Dirección donde escucha. Por defecto, la de CAUDAL_SIM_DASHBOARD_HOST."),
+    ] = None,
+    port: Annotated[
+        int | None,
+        typer.Option(
+            help=f"Puerto. Por defecto {DEFAULT_DASHBOARD_PORT}.", min=MIN_PORT, max=MAX_PORT
+        ),
+    ] = None,
+) -> None:
+    """Levanta la API local del tablero (Swagger en /docs). Escucha en este equipo por defecto."""
+    settings = DashboardSettings()
+    bind_host = host or settings.host
+    bind_port = port or settings.port
+    if bind_host not in LOOPBACK_HOSTS:
+        typer.echo(
+            f"Atención: el tablero escucha en {bind_host}, fuera de este equipo. "
+            "Usa solo redes de confianza."
+        )
+    typer.echo(f"Tablero del simulador en http://{bind_host}:{bind_port} (Swagger en /docs).")
+    session = DashboardSession(scenario=NO_SIMULATION_NAME)
+    uvicorn.run(create_dashboard_app(session), host=bind_host, port=bind_port, log_level="warning")
 
 
 @app.command("export-actas")

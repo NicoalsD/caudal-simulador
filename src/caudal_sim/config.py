@@ -43,3 +43,27 @@ class SimulatorSettings(BaseSettings):
         ge=MIN_TIMEOUT_SECONDS,
         description="Timeout of each HTTP call to the API, in seconds.",
     )
+
+
+DEFAULT_DASHBOARD_HOST = "127.0.0.1"
+DEFAULT_DASHBOARD_PORT = 8000
+MIN_PORT = 1
+MAX_PORT = 65535
+DASHBOARD_ENV_PREFIX = "CAUDAL_SIM_DASHBOARD_"
+
+
+class DashboardSettings(BaseSettings):
+    """Where the local dashboard API listens. It needs no credentials.
+
+    The default host is the loopback address, so the API is only reachable from this computer.
+    Other addresses are allowed on purpose (for example, inside a container), and the CLI warns.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix=DASHBOARD_ENV_PREFIX,
+        env_file=ENV_FILE,
+        extra="ignore",
+    )
+
+    host: str = Field(default=DEFAULT_DASHBOARD_HOST, min_length=1)
+    port: int = Field(default=DEFAULT_DASHBOARD_PORT, ge=MIN_PORT, le=MAX_PORT)
