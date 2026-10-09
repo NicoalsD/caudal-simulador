@@ -22,6 +22,9 @@ jobs:
       - name: Instala dependencias bloqueadas
         run: uv sync --locked
 
+      - name: Audita dependencias contra vulnerabilidades conocidas
+        run: uv run pip-audit
+
       - name: Valida formato y reglas de estilo
         run: |
           uv run ruff check .
@@ -64,3 +67,17 @@ jobs:
 
       - name: Construye el tablero
         run: pnpm build
+
+  seguridad:
+    name: Seguridad (escaneo de secretos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Busca secretos en todo el historial
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
