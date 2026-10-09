@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Simulador de datos del acueducto veredal de Guaitarilla (CAUDAL). Datos simulados, no reales."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "numpy==2.5.3",
     "pydantic==2.14.0",
     "pyyaml==6.0.3",
     "typer==0.27.3",
