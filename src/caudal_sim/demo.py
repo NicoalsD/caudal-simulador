@@ -103,7 +103,8 @@ class DemoDirector:
             self._gauge_error(hour)
         if hour == self._spec.muddy_hour:
             self._muddy_water(hour)
-        if hour in self._leak_report_hours:
+        # One household report per reported leak, so two leaks reported together are two reports.
+        for _ in range(self._leak_report_hours.count(hour)):
             self._leak_report(hour)
         if hour == self._spec.silent_sensor_hour:
             self._silent_sensor(hour)
@@ -219,13 +220,14 @@ class DemoDirector:
         self._checks.append(DemoCheck(step, expected, observed, passed))
 
 
-def _leak_report_hours(run: SimulationRun, hour_of_day: int) -> frozenset[int]:
+def _leak_report_hours(run: SimulationRun, hour_of_day: int) -> tuple[int, ...]:
+    """Hour of each household report of the run, one entry per reported leak, in order."""
     horizon = run.days * HOURS_PER_DAY
-    hours: set[int] = set()
+    hours: list[int] = []
     for leak in run.truth.leaks:
         if leak.reported_day is None:
             continue
         hour = leak.reported_day * HOURS_PER_DAY + hour_of_day
         if hour < horizon:
-            hours.add(hour)
-    return frozenset(hours)
+            hours.append(hour)
+    return tuple(sorted(hours))

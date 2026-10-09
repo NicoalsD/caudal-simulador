@@ -61,7 +61,9 @@ def _reading_answer(request: httpx.Request) -> httpx.Response:
 
 def _run_demo(*, seed_override: int | None = None) -> tuple[DemoDirector, dict[str, list[bytes]]]:
     scenario = load_scenario(PRESENTATION_YAML)
-    run = run_simulation(scenario, DEMO_DAYS, seed_override or scenario.meta.default_seed)
+    run = run_simulation(
+        scenario, DEMO_DAYS, scenario.meta.default_seed if seed_override is None else seed_override
+    )
     key = Ed25519PrivateKey.generate()
     session = DashboardSession(scenario=scenario.meta.name)
     api = CaudalApiClient(BASE, timeout_seconds=5.0)
@@ -175,7 +177,7 @@ def test_leak_report_is_sent_only_at_the_hour_the_truth_says() -> None:
     assert scenario.demo is not None
     hours = _leak_report_hours(run, hour_of_day=scenario.demo.damage_report_hour_of_day)
 
-    assert hours == frozenset({REPORT_HOUR})
+    assert hours == (REPORT_HOUR,)
 
 
 def test_the_same_seed_sends_the_same_demo_requests() -> None:
