@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "caudal-sim"
+version = "0.1.0"
+description = "Simulador de datos del acueducto veredal de Guaitarilla (CAUDAL). Datos simulados, no reales."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy==2.5.3",
+    "pandas==3.0.6",
+    "pyarrow==26.0.0",
+    "pydantic==2.14.0",
+    "pyyaml==6.0.3",
+    "typer==0.27.3",
+]
+
+[project.scripts]
+caudal-sim = "caudal_sim.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/caudal_sim"]
+
+[dependency-groups]
+dev = [
+    "hypothesis==6.168.5",
+    "mypy==2.4.0",
+    "pandas-stubs==3.0.5.260914",
+    "pytest==9.1.1",
+    "ruff==0.16.10",
+    "types-pyyaml==6.0.12.20260906",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "N", "SIM", "PL", "RUF", "ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
