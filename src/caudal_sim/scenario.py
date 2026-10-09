@@ -190,6 +190,23 @@ class LeakSpec(BaseModel):
         return self
 
 
+class ReadingSpec(BaseModel):
+    """Lecturas del fontanero: horas del día en que lee la regla y error de la lectura."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    hours: list[int] = Field(min_length=1, max_length=HOURS_PER_DAY)
+    noise_sd_m: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _hours_are_sorted_unique_and_in_the_day(self) -> Self:
+        if any(not 0 <= hour < HOURS_PER_DAY for hour in self.hours):
+            raise ValueError("cada hora de lectura debe estar entre 0 y 23")
+        if self.hours != sorted(set(self.hours)):
+            raise ValueError("las horas de lectura deben ser únicas y en orden creciente")
+        return self
+
+
 class Scenario(BaseModel):
     """Escenario completo validado. Es inmutable una vez construido."""
 
@@ -203,6 +220,7 @@ class Scenario(BaseModel):
     demand: DemandSpec
     schedule: ScheduleSpec
     leaks: LeakSpec
+    readings: ReadingSpec
 
     @model_validator(mode="after")
     def _sector_references_are_valid(self) -> Self:
