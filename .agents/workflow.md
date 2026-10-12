@@ -94,19 +94,33 @@ git config core.hooksPath .githooks
 
 El hook `.githooks/commit-msg` rechaza los mensajes que no cumplen el formato y los trailers de IA. El workflow `commit-lint` aplica las mismas reglas a cada PR (título y commits).
 
-## 4. Pull requests
+## 4. Pull requests y fusión (obligatorio)
+
+Todo PR que se abra **se fusiona** en cuanto sus checks estén en verde. Ninguna persona ni agente de IA deja un PR abierto al terminar su tarea: abrir el PR y fusionarlo son parte del mismo trabajo.
 
 1. Actualiza tu rama base: `git checkout develop && git pull`.
 2. Crea tu rama, haz commits pequeños y empuja con tu cuenta.
-3. Abre el PR hacia `develop` con la plantilla en español. **El título también sigue `tipo: descripción`**, porque se convierte en el asunto del merge commit.
-4. Espera el check `commit-lint` (y, desde la Fase 1, build, pruebas y lint).
-5. Fusiona con **merge commit** (el repositorio no permite squash ni rebase), para conservar todos los commits:
+3. Abre el PR hacia `develop` con la plantilla en español, **con la cuenta del dueño del trabajo**. El título también sigue `tipo: descripción`, porque se convierte en el asunto del merge commit.
+4. Espera los checks (`commit-lint`, build, pruebas, lint, CodeQL, gitleaks) y corrige en la misma rama lo que falle. Nunca se fusiona un PR en rojo.
+5. Cambia a la cuenta del **autor del PR** con `gh auth switch`, comprueba que quedó activa y fusiona con **merge commit** (el repositorio no permite squash ni rebase), para conservar todos los commits:
 
 ```bash
-gh pr merge <número> --merge --subject "<título del PR>" --delete-branch
+n=<número del PR>
+gh pr checks "$n" --watch                                   # todo en verde
+autor=$(gh pr view "$n" --json author --jq .author.login)
+gh auth switch --hostname github.com --user "$autor"
+test "$(gh api user --jq .login)" = "$autor"                # la cuenta activa es la del autor
+gh pr merge "$n" --merge --subject "$(gh pr view "$n" --json title --jq .title)" --delete-branch
 ```
 
-Las aprobaciones, cuando se exijan, las dan personas. Un agente nunca aprueba con la cuenta de otro integrante.
+6. **Ramas apiladas** (una rama que sale de otra que aún no está en `develop`): se fusionan en orden, de la más antigua a la más nueva. Al fusionar la primera con `--delete-branch`, GitHub reapunta la siguiente a `develop`; si no lo hace, `gh pr edit <n> --base develop`. Cada PR se fusiona con la cuenta de su propio autor.
+7. Al terminar, vuelve a la cuenta con la que estabas trabajando (`gh auth switch`).
+
+Reglas:
+
+- Un PR se fusiona solo con la cuenta de su autor. Si esa cuenta no está disponible en la máquina, el PR espera; nunca se fusiona con otra cuenta.
+- Nadie aprueba su propio PR ni el de otro integrante usando una cuenta ajena (`gh pr review --approve`). Las aprobaciones, cuando se exijan, las dan personas.
+- Si `--delete-branch` no puede borrar la rama local porque está abierta en un worktree, se borra después con `git worktree remove` y `git branch -d`.
 
 ## 5. Versiones
 
