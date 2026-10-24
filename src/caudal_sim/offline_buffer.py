@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable
 
+from caudal_sim.scenario import BufferSpec
 from caudal_sim.telemetry_transport import (
     TelemetryRequest,
     TelemetryTransport,
@@ -47,15 +48,35 @@ class OfflineBufferTransport:
         subject: TelemetryTransport,
         *,
         capacity: int,
+        max_attempts: int,
         sleeper: Callable[[float], None],
     ) -> None:
         if capacity < 1:
             raise ValueError("la capacidad del buffer debe ser de al menos un lote")
+        if max_attempts < 1:
+            raise ValueError("drain necesita al menos un intento")
         self._subject = subject
         self._capacity = capacity
+        self._max_attempts = max_attempts
         self._sleeper = sleeper
         self._queue: deque[TelemetryRequest] = deque()
         self._rejected = 0
+
+    @classmethod
+    def from_spec(
+        cls,
+        subject: TelemetryTransport,
+        spec: BufferSpec,
+        *,
+        sleeper: Callable[[float], None],
+    ) -> OfflineBufferTransport:
+        """Builds the proxy with the capacity and the retry passes of the scenario."""
+        return cls(
+            subject,
+            capacity=spec.capacity_batches,
+            max_attempts=spec.max_attempts,
+            sleeper=sleeper,
+        )
 
     @property
     def pending(self) -> int:
@@ -94,20 +115,22 @@ class OfflineBufferTransport:
             delivered += 1
         return delivered
 
-    def drain(self, max_attempts: int) -> int:
-        """Flushes until the queue is empty or `max_attempts` passes have been made.
+    def drain(self, max_attempts: int | None = None) -> int:
+        """Flushes until the queue is empty or the attempts are spent.
 
-        Between two passes it waits with exponential backoff. Returns how many were delivered.
+        By default the attempts are the ones of the scenario. Between two passes it waits with
+        exponential backoff. Returns how many batches were delivered.
         """
-        if max_attempts < 1:
+        attempts = self._max_attempts if max_attempts is None else max_attempts
+        if attempts < 1:
             raise ValueError("drain necesita al menos un intento")
         delivered = 0
         delay = FIRST_BACKOFF_SECONDS
-        for attempt in range(1, max_attempts + 1):
+        for attempt in range(1, attempts + 1):
             delivered += self.flush()
             if not self._queue:
                 break
-            if attempt < max_attempts:
+            if attempt < attempts:
                 self._sleeper(delay)
                 delay = min(delay * BACKOFF_FACTOR, MAX_BACKOFF_SECONDS)
         return delivered

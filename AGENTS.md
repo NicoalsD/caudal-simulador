@@ -53,7 +53,7 @@ Comandos (disponibles cuando empiece la implementación):
 ```bash
 uv sync
 uv run caudal-sim generate --scenario normal-year --days 365 --seed 42
-uv run caudal-sim backfill --scenario normal-year --days 90
+uv run caudal-sim backfill readings --scenario normal-year --days 90
 uv run caudal-sim live --scenario presentation
 uv run pytest && uv run ruff check . && uv run mypy .
 ```

@@ -11,8 +11,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+import numpy as np
+
 from caudal_sim.actuator_driver import SimulatedMotorDriver
-from caudal_sim.sensors import Sensor, SourceSensor
+from caudal_sim.scenario import DevicesSpec
+from caudal_sim.sensors import Sensor, level_sensor_from_spec
 from caudal_sim.valve_actuator import Actuator, ValveActuator
 
 
@@ -44,20 +47,39 @@ class DeviceKitFactory(ABC):
 
 
 class FieldKitFactory(DeviceKitFactory):
-    """Family of the simulated field node: a sensor that reads the tank and a motorized valve."""
+    """Family of the simulated field node: a level sensor and a motorized valve.
+
+    Use `from_spec` so that every timing and fault value comes from the scenario.
+    """
 
     def __init__(
         self,
-        tank_level: Callable[[datetime], float],
+        sensor_chain: Callable[[], Sensor],
         valve_travel_time: timedelta,
         valve_max_travel_time: timedelta,
     ) -> None:
-        self._tank_level = tank_level
+        self._sensor_chain = sensor_chain
         self._valve_travel_time = valve_travel_time
         self._valve_max_travel_time = valve_max_travel_time
 
+    @classmethod
+    def from_spec(
+        cls,
+        devices: DevicesSpec,
+        *,
+        tank_level: Callable[[datetime], float],
+        start: datetime,
+        rng: np.random.Generator,
+    ) -> FieldKitFactory:
+        """Builds the family with the sensor faults and the valve times of the scenario."""
+        return cls(
+            lambda: level_sensor_from_spec(tank_level, devices.sensor, start, rng),
+            timedelta(seconds=devices.valve.travel_seconds),
+            timedelta(seconds=devices.valve.max_travel_seconds),
+        )
+
     def create_sensor(self) -> Sensor:
-        return SourceSensor(self._tank_level)
+        return self._sensor_chain()
 
     def create_actuator(self) -> Actuator:
         driver = SimulatedMotorDriver(self._valve_travel_time)

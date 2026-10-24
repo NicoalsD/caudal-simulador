@@ -8,7 +8,10 @@ from typing import Protocol
 
 import numpy as np
 
+from caudal_sim.scenario import SensorSpec
+
 ONE_DAY = timedelta(days=1)
+ONE_HOUR = timedelta(hours=1)
 
 
 class Sensor(Protocol):
@@ -99,3 +102,23 @@ class DriftingSensor:
         elapsed = at - self._drift_start
         days = max(elapsed, timedelta(0)) / ONE_DAY
         return self._inner.read(at) + self._drift_m_per_day * days
+
+
+def level_sensor_from_spec(
+    source: Callable[[datetime], float],
+    spec: SensorSpec,
+    start: datetime,
+    rng: np.random.Generator,
+) -> Sensor:
+    """Builds the sensor of a level node from the scenario.
+
+    The chain is noise first, then drift, then the stuck window on the outside, so a frozen
+    value is the value the faulty sensor would have reported.
+    """
+    noisy = NoisySensor(SourceSensor(source), rng, spec.noise_sd_m)
+    drifting = DriftingSensor(noisy, spec.drift_m_per_day, start + spec.drift_start_hour * ONE_HOUR)
+    return StuckSensor(
+        drifting,
+        start + spec.stuck_from_hour * ONE_HOUR,
+        start + spec.stuck_until_hour * ONE_HOUR,
+    )

@@ -43,3 +43,70 @@ class SimulatorSettings(BaseSettings):
         ge=MIN_TIMEOUT_SECONDS,
         description="Timeout of each HTTP call to the API, in seconds.",
     )
+
+
+DEFAULT_DASHBOARD_HOST = "127.0.0.1"
+DEFAULT_DASHBOARD_PORT = 8000
+MIN_PORT = 1
+MIN_HOURS = 1
+MAX_PORT = 65535
+DASHBOARD_ENV_PREFIX = "CAUDAL_SIM_DASHBOARD_"
+DEFAULT_DASHBOARD_STATIC_DIR = Path("dashboard") / "dist"
+
+
+class DashboardSettings(BaseSettings):
+    """Where the local dashboard API listens. It needs no credentials.
+
+    The default host is the loopback address, so the API is only reachable from this computer.
+    Other addresses are allowed on purpose (for example, inside a container), and the CLI warns.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix=DASHBOARD_ENV_PREFIX,
+        env_file=ENV_FILE,
+        extra="ignore",
+    )
+
+    host: str = Field(default=DEFAULT_DASHBOARD_HOST, min_length=1)
+    port: int = Field(default=DEFAULT_DASHBOARD_PORT, ge=MIN_PORT, le=MAX_PORT)
+    static_dir: Path = Field(
+        default=DEFAULT_DASHBOARD_STATIC_DIR,
+        description="Built dashboard (dashboard/dist). Served by the API when it exists.",
+    )
+
+
+SIMULATION_SPEED_FACTORS = (1, 10, 60)
+DEFAULT_SPEED_FACTOR = 1
+
+
+LIVE_ENV_PREFIX = "CAUDAL_SIM_LIVE_"
+DEFAULT_HOUR_SECONDS = 1.0
+
+
+class LiveSettings(BaseSettings):
+    """Identities and pacing of the live mode. Every secret comes from the environment.
+
+    The operator logs in to send readings. The board user is only needed for `--auto-junta`.
+    The device identifier signs the telemetry; its private key is read from `keys/`.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix=LIVE_ENV_PREFIX,
+        env_file=ENV_FILE,
+        extra="ignore",
+    )
+
+    operator_username: str = Field(min_length=1, description="Usuario OPERATOR que envía lecturas.")
+    operator_password: SecretStr = Field(description="Contraseña del usuario OPERATOR.")
+    board_username: str | None = Field(
+        default=None, description="Usuario de la Junta, solo para --auto-junta."
+    )
+    board_password: SecretStr | None = Field(
+        default=None, description="Contraseña del usuario de la Junta, solo para --auto-junta."
+    )
+    device_id: UUID = Field(description="Identificador del nodo de nivel simulado.")
+    hour_seconds: float = Field(
+        default=DEFAULT_HOUR_SECONDS,
+        ge=0,
+        description="Segundos reales por hora simulada a velocidad 1.",
+    )

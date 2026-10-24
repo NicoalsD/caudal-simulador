@@ -1,0 +1,43 @@
+# Secrets and keys never enter the image: they are mounted at run time (see docs/claves-y-secretos.md).
+.env
+.env.*
+!.env.example
+keys/
+*.pem
+*.key
+secrets/
+
+# Version control and editors
+.git
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+.DS_Store
+
+# Python and tool caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Dashboard: dependencies and build are produced inside the image
+dashboard/node_modules/
+dashboard/dist/
+
+# Generated output and logs
+outputs/
+logs/
+*.log
+
+# Not needed to run the simulator
+tests/
+docs/
+.github/
+.githooks/

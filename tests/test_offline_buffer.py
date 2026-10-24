@@ -45,7 +45,9 @@ class ScriptedSubject:
 
 
 def _proxy(subject: ScriptedSubject, sleeps: list[float]) -> OfflineBufferTransport:
-    return OfflineBufferTransport(subject, capacity=CAPACITY, sleeper=sleeps.append)
+    return OfflineBufferTransport(
+        subject, capacity=CAPACITY, max_attempts=MAX_ATTEMPTS, sleeper=sleeps.append
+    )
 
 
 def _batch(point: dict[str, object]) -> TelemetryRequest:
@@ -156,4 +158,6 @@ def test_rejected_batch_is_removed_and_does_not_block_the_queue() -> None:
 
 def test_buffer_needs_room_for_at_least_one_batch() -> None:
     with pytest.raises(ValueError, match="al menos un lote"):
-        OfflineBufferTransport(ScriptedSubject([]), capacity=0, sleeper=lambda _s: None)
+        OfflineBufferTransport(
+            ScriptedSubject([]), capacity=0, max_attempts=1, sleeper=lambda _s: None
+        )

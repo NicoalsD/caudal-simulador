@@ -11,6 +11,8 @@ Simulador virtual del acueducto (gemelo digital) en **Python 3.12**: como no hay
 - [AGENTS.md](AGENTS.md): reglas obligatorias para personas y agentes.
 - [Flujo de trabajo](.agents/workflow.md): cuentas, ramas, commits y PR.
 - [Política de seguridad](SECURITY.md).
+- [Escenarios](docs/escenarios.md): catálogo de escenarios YAML, sus supuestos y cómo crear uno nuevo.
+- [Despliegue](docs/despliegue.md): ejecución local y en contenedor, variables de entorno, puertos y tablero.
 
 ## Equipo
 
