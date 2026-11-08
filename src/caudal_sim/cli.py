@@ -24,11 +24,13 @@ from caudal_sim.config import (
     DEFAULT_DASHBOARD_PORT,
     ENV_PREFIX,
     LIVE_ENV_PREFIX,
+    MAQUETA_ENV_PREFIX,
     MAX_PORT,
     MIN_HOURS,
     MIN_PORT,
     DashboardSettings,
     LiveSettings,
+    MaquetaSettings,
     SimulatorSettings,
 )
 from caudal_sim.dashboard_api import DashboardServer, create_dashboard_app
@@ -37,8 +39,10 @@ from caudal_sim.demo import DemoCheck, DemoDirector
 from caudal_sim.demo_guard import DemoTargetGuard, NonDemoTargetError
 from caudal_sim.export import FORMATS, Format, export_run
 from caudal_sim.live import LiveAbortedError, LiveOptions, LiveRunner, LiveWiring, NetworkGate
+from caudal_sim.maqueta_device import MaquetaIdentities, MaquetaReport, build_maqueta_device
+from caudal_sim.maqueta_spec import MaquetaSpec, MaquetaSpecError, load_maqueta_spec
 from caudal_sim.minutes_export import export_confirmed_executions
-from caudal_sim.offline_buffer import OfflineBufferTransport
+from caudal_sim.offline_buffer import BufferFullError, OfflineBufferTransport
 from caudal_sim.scenario import Scenario, ScenarioError
 from caudal_sim.signing import SigningKeyError, load_private_key
 from caudal_sim.telemetry_transport import DeviceIdentity, SignedHttpTransport
@@ -57,6 +61,7 @@ EXIT_SCENARIO_ERROR = 1
 EXIT_CONFIG_ERROR = 2
 EXIT_IMPORT_ERROR = 3
 EXIT_LIVE_ERROR = 4
+EXIT_RUNTIME_ERROR = 5
 DEFAULT_LIVE_DAYS = 1
 DEFAULT_DEMO_DAYS = 3
 DEMO_SCENARIO = "presentation"
@@ -401,6 +406,94 @@ def _load_key_or_exit(path: Path) -> Ed25519PrivateKey:
     except SigningKeyError as error:
         typer.echo(f"Error: {error.message}", err=True)
         raise typer.Exit(code=EXIT_CONFIG_ERROR) from error
+
+
+DEFAULT_MAQUETA_SCENARIO = "scenarios/maqueta.yaml"
+
+
+@app.command()
+def maqueta(
+    *,
+    scenario: Annotated[
+        str,
+        typer.Option(help="Ruta del escenario de la maqueta (YAML)."),
+    ] = DEFAULT_MAQUETA_SCENARIO,
+    api_url: Annotated[
+        str | None,
+        typer.Option(
+            help="URL base de caudal-backend. Por defecto, CAUDAL_SIM_MAQUETA_API_BASE_URL."
+        ),
+    ] = None,
+    seconds: Annotated[
+        float | None,
+        typer.Option(help="Segundos de la corrida. Sin valor, corre hasta Ctrl+C.", min=0.0),
+    ] = None,
+) -> None:
+    """Corre la maqueta virtual: tanque, bomba, flotador y dos salidas firmadas con la API.
+
+    Los datos son simulados. Envía el nivel como telemetría y ejecuta los comandos de sus
+    válvulas, respondiendo cada uno con su resultado.
+    """
+    spec = _maqueta_spec_or_exit(_scenario_path(scenario))
+    settings = _maqueta_settings_or_exit()
+    identities = _maqueta_identities_or_exit(settings)
+    base_url = api_url or settings.api_base_url
+    with httpx.Client(base_url=base_url, timeout=settings.http_timeout_seconds) as http:
+        device = build_maqueta_device(spec, identities, http)
+        try:
+            report = device.run(seconds)
+        except KeyboardInterrupt:
+            report = device.finish()
+        except BufferFullError as error:
+            typer.echo(f"Error: {error}", err=True)
+            _print_maqueta_report(device.report)
+            raise typer.Exit(code=EXIT_RUNTIME_ERROR) from error
+    _print_maqueta_report(report)
+
+
+def _maqueta_spec_or_exit(path: Path) -> MaquetaSpec:
+    try:
+        return load_maqueta_spec(path)
+    except MaquetaSpecError as error:
+        typer.echo(f"Error: {error.message}", err=True)
+        raise typer.Exit(code=EXIT_CONFIG_ERROR) from error
+
+
+def _maqueta_settings_or_exit() -> MaquetaSettings:
+    try:
+        return MaquetaSettings()
+    except ValidationError as error:
+        names = sorted(
+            {f"{MAQUETA_ENV_PREFIX}{str(item['loc'][0]).upper()}" for item in error.errors()}
+        )
+        typer.echo(
+            "Error: faltan o son inválidas estas variables de entorno (revisa .env): "
+            + ", ".join(names),
+            err=True,
+        )
+        raise typer.Exit(code=EXIT_CONFIG_ERROR) from error
+
+
+def _maqueta_identities_or_exit(settings: MaquetaSettings) -> MaquetaIdentities:
+    sensor_key = _load_key_or_exit(settings.sensor_private_key_path)
+    valve_1_key = _load_key_or_exit(settings.valve_1_private_key_path)
+    valve_2_key = _load_key_or_exit(settings.valve_2_private_key_path)
+    return MaquetaIdentities(
+        sensor=DeviceIdentity(settings.sensor_device_id, sensor_key),
+        outlets=(
+            (DeviceIdentity(settings.valve_1_device_id, valve_1_key), settings.valve_1_valve_id),
+            (DeviceIdentity(settings.valve_2_device_id, valve_2_key), settings.valve_2_valve_id),
+        ),
+    )
+
+
+def _print_maqueta_report(report: MaquetaReport) -> None:
+    typer.echo(
+        f"Maqueta: {report.ticks} ciclos, {report.batches_sent} lotes de telemetría enviados, "
+        f"nivel final {report.last_level_m:.2f} m, {report.network_errors} errores de red."
+    )
+    if report.last_error:
+        typer.echo(f"Último error: {report.last_error}")
 
 
 @app.command("export-actas")
