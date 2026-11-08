@@ -130,10 +130,22 @@ class SignedHttpTransport:
         self._nonce_source = nonce_source
 
     def send(self, request: TelemetryRequest) -> None:
+        self.exchange(POST_METHOD, request.path, request.body)
+
+    def exchange(self, method: str, path: str, body: bytes = b"") -> httpx.Response:
+        """One signed request to a device route. Returns the answer when it is a success.
+
+        Raises `TransportUnavailableError` when there is no answer or the server fails, and
+        `TransportRejectedError` for a 4xx answer. The maqueta uses it for GET and ack too.
+        """
+        if not path.startswith(API_PATH_PREFIX):
+            raise ValueError("la ruta de un dispositivo debe empezar por /api/v1/")
+        if len(body) > MAX_BODY_BYTES:
+            raise ValueError("el cuerpo de la petición supera 256 KiB")
         timestamp = self._clock()
         nonce = self._nonce_source()
         signature = sign_bytes(
-            canonical_string(POST_METHOD, request.path, timestamp, nonce, request.body),
+            canonical_string(method, path, timestamp, nonce, body),
             self._identity.private_key,
         )
         headers = {
@@ -144,13 +156,14 @@ class SignedHttpTransport:
             CONTENT_TYPE_HEADER: JSON_CONTENT_TYPE,
         }
         try:
-            response = self._http.post(request.path, content=request.body, headers=headers)
+            response = self._http.request(method, path, content=body, headers=headers)
         except httpx.TransportError as error:
             raise TransportUnavailableError("No se pudo conectar con la API.") from error
         if response.status_code >= SERVER_ERROR_FROM:
             raise TransportUnavailableError("La API no respondió correctamente.")
         if response.status_code >= CLIENT_ERROR_FROM:
             raise TransportRejectedError(response.status_code, _error_code(response))
+        return response
 
 
 def _error_code(response: httpx.Response) -> str:
