@@ -128,6 +128,7 @@ Todos aceptan `--scenario` con el nombre del archivo (`scenarios/<nombre>.yaml`)
 | `uv run caudal-sim backfill readings`, `shift-executions` o `incidents` | Importa el historial simulado al acueducto demo. `--dry-run` cuenta los lotes sin contactar la API, pero igual necesita las variables de `.env` (ver [despliegue.md](despliegue.md#4-variables-de-entorno)). | 90 |
 | `uv run caudal-sim live` | Simula en tiempo real y envía los datos al acueducto demo. Acepta `--start AAAA-MM-DD`. | 1 |
 | `uv run caudal-sim demo` | Guion de demostración. Exige la sección `demo`. | 3 |
+| `uv run caudal-sim maqueta` | Corre la maqueta virtual con `scenarios/maqueta.yaml`. Usa su propio formato (sin clima ni consumo), no `Scenario`. Ver [operacion-live.md](operacion-live.md#7-maqueta-virtual-caudal-sim-maqueta). | sin límite (`--seconds`) |
 
 Ejemplo con otra semilla y salida solo en CSV:
 

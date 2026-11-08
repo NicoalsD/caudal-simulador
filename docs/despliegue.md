@@ -120,6 +120,10 @@ Se leen de `.env` (o del entorno) con pydantic-settings. Copia `.env.example` a 
 | `CAUDAL_SIM_LIVE_BOARD_PASSWORD` | **Secreto.** Contraseña de la Junta, solo para `--auto-junta`. | `LiveSettings` |
 | `CAUDAL_SIM_LIVE_DEVICE_ID` | Identificador del nodo de nivel simulado registrado en el backend. | `LiveSettings` |
 | `CAUDAL_SIM_LIVE_HOUR_SECONDS` | Segundos reales por hora simulada a velocidad 1 (por defecto 1.0). | `LiveSettings` |
+| `CAUDAL_SIM_MAQUETA_API_BASE_URL` | URL base de la API para la maqueta virtual. | `MaquetaSettings` |
+| `CAUDAL_SIM_MAQUETA_SENSOR_DEVICE_ID`, `CAUDAL_SIM_MAQUETA_VALVE_1_DEVICE_ID`, `CAUDAL_SIM_MAQUETA_VALVE_2_DEVICE_ID` | Identificadores de los tres dispositivos firmados de la maqueta (sensor y dos actuadores). | `MaquetaSettings` |
+| `CAUDAL_SIM_MAQUETA_VALVE_1_VALVE_ID`, `CAUDAL_SIM_MAQUETA_VALVE_2_VALVE_ID` | Válvulas que mueven las salidas 1 y 2. | `MaquetaSettings` |
+| `CAUDAL_SIM_MAQUETA_*_PRIVATE_KEY_PATH` | **Secreto** por ruta: claves privadas de los tres dispositivos (por defecto en `keys/`). | `MaquetaSettings` |
 
 `generate`, `export-actas`, `export-backtest` y `tablero` no necesitan credenciales. `backfill` (también con `--dry-run`), `live` y `demo` sí: si falta una variable obligatoria o es inválida, el comando termina con código 2 y un mensaje que nombra esas variables, sin mostrar sus valores.
 
