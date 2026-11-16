@@ -1,0 +1,41 @@
+# Maqueta física por USB (Arduino UNO). La lee `caudal-sim maqueta-usb` y la reescribe
+# `caudal-sim maqueta-usb calibrar`. Los valores de abajo son de partida: calibra antes de usar.
+# Distancias en milímetros, ángulos en grados, tiempos en segundos.
+
+serial:
+  # Linux: /dev/ttyACM0 (UNO original) o /dev/ttyUSB0 (clon con CH340). Windows: COM3, COM4...
+  # `caudal-sim maqueta-usb puertos` lista los puertos conectados.
+  port: /dev/ttyACM0
+  baud: 115200
+  # Abrir el puerto reinicia el UNO; esto es lo que se espera su línea READY.
+  ready_timeout_seconds: 4
+
+sensor:
+  # Del HC-SR04 al fondo con la botella vacía. Suposición: medir con `calibrar`.
+  empty_distance_mm: 350
+  # Del HC-SR04 al agua con la botella llena. Suposición: medir con `calibrar`.
+  full_distance_mm: 80
+  # Por debajo de esta distancia el HC-SR04 no mide bien: el agua llena debe quedar más lejos.
+  blind_zone_mm: 30
+
+servos:
+  # open_deg deja la manguera libre; closed_deg la pisa. Suposición: medir con `calibrar`.
+  - {name: Salida 1, open_deg: 90, closed_deg: 0}
+  - {name: Salida 2, open_deg: 90, closed_deg: 0}
+
+valve:
+  # Tiempo nominal de maniobra del servo (el UNO lo mueve a 1 grado cada 8 ms).
+  travel_seconds: 2
+  # Si el UNO no confirma la posición en este tiempo, la válvula queda en FAULT.
+  max_travel_seconds: 5
+
+timing:
+  # Cada ciclo lee el nivel una vez.
+  tick_seconds: 1.0
+  # La API permite 60 peticiones firmadas por minuto por dispositivo.
+  telemetry_interval_seconds: 20
+  command_poll_seconds: 2
+
+buffer:
+  capacity_batches: 500
+  max_attempts: 5
