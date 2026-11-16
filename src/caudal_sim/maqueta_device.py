@@ -24,16 +24,22 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from time import sleep
+from typing import Protocol
 from uuid import UUID, uuid4
 
 import httpx
 
-from caudal_sim.actuator_driver import SimulatedMotorDriver
+from caudal_sim.actuator_driver import ActuatorDriver, SimulatedMotorDriver
 from caudal_sim.event_bus import SimulationEventBus
 from caudal_sim.live import LEVEL_DECIMALS, LEVEL_METRIC
 from caudal_sim.maqueta_commands import HttpCommandSource
-from caudal_sim.maqueta_plant import MaquetaPlant, MaquetaPlantBuilder, PlantStep
-from caudal_sim.maqueta_spec import MaquetaSpec
+from caudal_sim.maqueta_plant import MaquetaPlantBuilder
+from caudal_sim.maqueta_spec import (
+    MaquetaBufferSpec,
+    MaquetaSpec,
+    MaquetaTimingSpec,
+    MaquetaValveSpec,
+)
 from caudal_sim.offline_buffer import OfflineBufferTransport
 from caudal_sim.telemetry_transport import (
     DeviceIdentity,
@@ -50,6 +56,32 @@ from caudal_sim.valve_state import ValveStatus
 
 MAX_POINTS_PER_BATCH = 100
 RATE_LIMITED_CODE = "RATE_LIMITED"
+
+
+class LevelStep(Protocol):
+    """What one step of the tank gives the device: the level, in meters."""
+
+    @property
+    def level_m(self) -> float: ...
+
+
+class TankSource(Protocol):
+    """Where the level comes from: the tank model of the virtual maqueta or the real sensor."""
+
+    def advance(self, seconds: float, openings: tuple[float, ...]) -> LevelStep: ...
+
+
+class DeviceSpec(Protocol):
+    """The parameters the device loop needs, shared by the virtual and the USB maqueta."""
+
+    @property
+    def valve(self) -> MaquetaValveSpec: ...
+
+    @property
+    def timing(self) -> MaquetaTimingSpec: ...
+
+    @property
+    def buffer(self) -> MaquetaBufferSpec: ...
 
 
 @dataclass
@@ -107,10 +139,10 @@ class MaquetaDevice:
     @pattern P20 Template Method
     """
 
-    plant: MaquetaPlant
+    plant: TankSource
     telemetry: OfflineBufferTransport
     outlets: tuple[OutletChannel, ...]
-    spec: MaquetaSpec
+    spec: DeviceSpec
     clock: Callable[[], datetime]
     sleeper: Callable[[float], None]
     point_id_factory: Callable[[], UUID] = uuid4
@@ -152,7 +184,7 @@ class MaquetaDevice:
         for channel in self.outlets:
             channel.actuator.advance(timedelta(seconds=tick))
 
-    def _advance_tank(self, tick: float) -> PlantStep:
+    def _advance_tank(self, tick: float) -> LevelStep:
         openings = tuple(
             _opening_of(channel.actuator, timedelta(seconds=self.spec.valve.travel_seconds))
             for channel in self.outlets
@@ -161,7 +193,7 @@ class MaquetaDevice:
         self.report.last_level_m = step.level_m
         return step
 
-    def _record_level(self, now: datetime, step: PlantStep) -> None:
+    def _record_level(self, now: datetime, step: LevelStep) -> None:
         self._pending_points.append(
             {
                 "id": str(self.point_id_factory()),
@@ -244,6 +276,33 @@ def build_maqueta_device(  # noqa: PLR0913 - each parameter is one injected coll
     if initial_level_m is not None:
         builder.with_initial_level(initial_level_m)
     plant = builder.build()
+    return assemble_maqueta_device(
+        plant,
+        spec,
+        identities,
+        http,
+        lambda _index: SimulatedMotorDriver(timedelta(seconds=spec.valve.travel_seconds)),
+        clock=clock,
+        sleeper=sleeper,
+        point_id_factory=point_id_factory,
+    )
+
+
+def assemble_maqueta_device(  # noqa: PLR0913 - each parameter is one injected collaborator
+    plant: TankSource,
+    spec: DeviceSpec,
+    identities: MaquetaIdentities,
+    http: httpx.Client,
+    driver_for: Callable[[int], ActuatorDriver],
+    *,
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    sleeper: Callable[[float], None] = sleep,
+    point_id_factory: Callable[[], UUID] = uuid4,
+) -> MaquetaDevice:
+    """Wires any tank source and motor drivers to the API: one signed transport per identity.
+
+    `driver_for(index)` gives the motor driver of outlet `index` (0-based).
+    """
     sensor_transport = SignedHttpTransport(http, identities.sensor)
     telemetry = OfflineBufferTransport(
         RateLimitRetry(sensor_transport),
@@ -252,11 +311,10 @@ def build_maqueta_device(  # noqa: PLR0913 - each parameter is one injected coll
         sleeper=sleeper,
     )
     bus = SimulationEventBus()
-    valve_travel = timedelta(seconds=spec.valve.travel_seconds)
     max_travel = timedelta(seconds=spec.valve.max_travel_seconds)
     channels: list[OutletChannel] = []
-    for identity, valve_id in identities.outlets:
-        actuator = ValveActuator(SimulatedMotorDriver(valve_travel), max_travel)
+    for index, (identity, valve_id) in enumerate(identities.outlets):
+        actuator = ValveActuator(driver_for(index), max_travel)
         source = HttpCommandSource(SignedHttpTransport(http, identity), valve_id, _parse_instant)
         executor = ValveCommandExecutor(valve_id, actuator, source, bus)
         channels.append(OutletChannel(valve_id, actuator, executor, source))
