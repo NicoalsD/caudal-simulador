@@ -20,6 +20,7 @@ from caudal_sim.api_payload import ApiPayloadAdapter, ImportContext
 from caudal_sim.backfill import BackfillOptions, ImportKind, ImportLimitError, run_backfill
 from caudal_sim.backtest import export_backtest_windows
 from caudal_sim.builder import ScenarioBuilder
+from caudal_sim.cli_maqueta_usb import usb_app
 from caudal_sim.config import (
     DEFAULT_DASHBOARD_PORT,
     ENV_PREFIX,
@@ -92,6 +93,7 @@ backfill_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(backfill_app, name="backfill")
+app.add_typer(usb_app, name="maqueta-usb")
 
 
 @app.callback()
