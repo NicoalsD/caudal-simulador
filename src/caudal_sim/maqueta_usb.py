@@ -145,28 +145,25 @@ def save_usb_spec(spec: UsbMaquetaSpec, path: Path) -> None:
 
 @dataclass(frozen=True)
 class MeasuredLevel:
-    """One measurement of the real tank."""
+    """One measurement of the real tank. `level_m` is None when the ping got no echo."""
 
-    level_m: float
+    level_m: float | None
     distance_mm: int | None
 
 
 class SerialLevelSource:
-    """Level of the real bottle. When a ping gets no echo it keeps the last good level."""
+    """Level of the real bottle. A ping without echo gives no level, never a made-up one:
+    a misaimed sensor must not look like an empty tank to the backend and the autopilot."""
 
     def __init__(self, link: SerialLink, sensor: UsbSensorSpec) -> None:
         self._link = link
         self._sensor = sensor
-        self._last_level_m = 0.0
-        self.missed_readings = 0
 
     def advance(self, seconds: float, openings: tuple[float, ...]) -> MeasuredLevel:
         distance = self._link.distance_mm()
         if distance is None:
-            self.missed_readings += 1
-            return MeasuredLevel(self._last_level_m, None)
-        self._last_level_m = self._sensor.level_m(distance)
-        return MeasuredLevel(self._last_level_m, distance)
+            return MeasuredLevel(None, None)
+        return MeasuredLevel(self._sensor.level_m(distance), distance)
 
 
 class SerialServoDriver(ActuatorDriver):

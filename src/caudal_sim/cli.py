@@ -492,7 +492,8 @@ def _maqueta_identities_or_exit(settings: MaquetaSettings) -> MaquetaIdentities:
 def _print_maqueta_report(report: MaquetaReport) -> None:
     typer.echo(
         f"Maqueta: {report.ticks} ciclos, {report.batches_sent} lotes de telemetría enviados, "
-        f"nivel final {report.last_level_m:.2f} m, {report.network_errors} errores de red."
+        f"nivel final {report.last_level_m:.2f} m, {report.network_errors} errores de red, "
+        f"{report.missed_readings} lecturas sin eco."
     )
     if report.last_error:
         typer.echo(f"Último error: {report.last_error}")

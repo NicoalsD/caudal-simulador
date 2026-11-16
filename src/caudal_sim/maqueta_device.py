@@ -59,10 +59,13 @@ RATE_LIMITED_CODE = "RATE_LIMITED"
 
 
 class LevelStep(Protocol):
-    """What one step of the tank gives the device: the level, in meters."""
+    """What one step of the tank gives the device: the level, in meters.
+
+    None means the sensor gave no reading this step: no point is sent for it.
+    """
 
     @property
-    def level_m(self) -> float: ...
+    def level_m(self) -> float | None: ...
 
 
 class TankSource(Protocol):
@@ -93,6 +96,7 @@ class MaquetaReport:
     batches_queued: int = 0
     network_errors: int = 0
     last_level_m: float = 0.0
+    missed_readings: int = 0
     last_error: str = ""
 
 
@@ -190,10 +194,15 @@ class MaquetaDevice:
             for channel in self.outlets
         )
         step = self.plant.advance(tick, openings)
-        self.report.last_level_m = step.level_m
+        if step.level_m is None:
+            self.report.missed_readings += 1
+        else:
+            self.report.last_level_m = step.level_m
         return step
 
     def _record_level(self, now: datetime, step: LevelStep) -> None:
+        if step.level_m is None:
+            return
         self._pending_points.append(
             {
                 "id": str(self.point_id_factory()),
