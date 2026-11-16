@@ -231,3 +231,14 @@ def test_a_servo_that_never_answers_ends_in_fault() -> None:
     device.run(seconds=load_usb_spec(CONFIG).valve.max_travel_seconds + OPEN_RUN_SECONDS)
 
     assert device.outlets[0].actuator.status is ValveStatus.FAULT
+
+
+def test_a_reading_without_echo_sends_no_point_and_is_counted() -> None:
+    setup = make_setup()
+    uno = FakeUno(distance_mm=-1)
+    device = _device(setup, uno, StepClock(START))
+
+    report = device.run(seconds=load_usb_spec(CONFIG).timing.telemetry_interval_seconds)
+
+    assert setup.api.telemetry == []
+    assert report.missed_readings == load_usb_spec(CONFIG).timing.telemetry_interval_seconds
