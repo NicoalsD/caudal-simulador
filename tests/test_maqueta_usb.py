@@ -183,16 +183,17 @@ def _position_spec() -> UsbMaquetaSpec:
     return spec.model_copy(update={"servos": servos})
 
 
-def _device(
+def _device(  # noqa: PLR0913 - test helper with optional overrides
     setup: MaquetaSetup,
     uno: FakeUno,
     clock: StepClock,
     *,
     hold_torque: bool | None = None,
     spin: UsbSpinSpec | None = None,
+    state_file: Path | None = None,
 ) -> MaquetaDevice:
     http = httpx.Client(base_url=BASE_URL, transport=setup.api.transport())
-    spec = _position_spec()
+    spec = _position_spec().model_copy(update={"state_file": state_file})
     if spin is not None:
         servos = tuple(servo.model_copy(update={"spin": spin}) for servo in spec.servos)
         spec = spec.model_copy(update={"servos": servos})
@@ -380,3 +381,24 @@ def test_the_real_maqueta_turns_its_360_degree_servos_by_time() -> None:
     spec = load_usb_spec(CONFIG)
 
     assert all(servo.spin is not None for servo in spec.servos)
+
+
+def test_a_continuous_servo_remembers_it_was_left_open_across_a_restart(tmp_path: Path) -> None:
+    state = tmp_path / "state.json"
+    setup = _open_command_setup("0190f3a2-7777-7000-8000-000000000045")
+    device = _device(setup, FakeUno(), StepClock(START), spin=SPIN, state_file=state)
+    device.run(seconds=OPEN_RUN_SECONDS)
+
+    restarted = _device(make_setup(), FakeUno(), StepClock(START), spin=SPIN, state_file=state)
+
+    assert restarted.outlets[0].actuator.status is ValveStatus.OPEN
+    assert restarted.outlets[1].actuator.status is ValveStatus.CLOSED
+
+
+def test_an_unreadable_state_file_starts_every_valve_closed(tmp_path: Path) -> None:
+    state = tmp_path / "state.json"
+    state.write_text("not json", encoding="utf-8")
+
+    device = _device(make_setup(), FakeUno(), StepClock(START), spin=SPIN, state_file=state)
+
+    assert all(outlet.actuator.status is ValveStatus.CLOSED for outlet in device.outlets)

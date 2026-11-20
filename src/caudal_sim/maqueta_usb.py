@@ -16,6 +16,7 @@ The calibration lives in a YAML file (`scenarios/maqueta-usb.yaml` by default):
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -50,6 +51,8 @@ from caudal_sim.serial_link import (
     SerialLink,
     SerialLinkError,
 )
+from caudal_sim.valve_actuator import ValveActuatorState
+from caudal_sim.valve_state import ValveStatus
 
 MILLIMETERS_PER_METER = 1000.0
 
@@ -155,6 +158,13 @@ class UsbMaquetaSpec(BaseModel):
     valve: MaquetaValveSpec
     timing: MaquetaTimingSpec
     buffer: MaquetaBufferSpec
+    state_file: Path | None = Field(
+        default=None,
+        description=(
+            "Archivo donde el puente guarda si cada llave de 360° quedó abierta o cerrada, "
+            "para recuperarlo al arrancar."
+        ),
+    )
 
     @model_validator(mode="after")
     def _spins_fit_the_travel(self) -> Self:
@@ -218,6 +228,35 @@ class SerialLevelSource:
         return MeasuredLevel(self._sensor.level_m(distance), distance)
 
 
+class ServoPositionStore:
+    """Remembers, in a small JSON file, whether each 360-degree servo was left OPEN or CLOSED.
+
+    Such a servo cannot tell where it is, so after a restart of the bridge (the UNO resets
+    when its port opens) this file is the only memory of the hose.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+
+    def load(self) -> dict[int, ValveStatus]:
+        try:
+            raw = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        known = {ValveStatus.OPEN.value, ValveStatus.CLOSED.value}
+        return {
+            int(servo): ValveStatus(status)
+            for servo, status in raw.items()
+            if str(servo).isdigit() and status in known
+        }
+
+    def save(self, servo: int, status: ValveStatus) -> None:
+        current = {str(key): value.value for key, value in self.load().items()}
+        current[str(servo)] = status.value
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(json.dumps(current, indent=2) + "\n", encoding="utf-8")
+
+
 class SerialServoDriver(ActuatorDriver):
     """Moves one servo through the UNO. The `DONE` line of the UNO is the limit switch.
 
@@ -226,8 +265,15 @@ class SerialServoDriver(ActuatorDriver):
     """
 
     def __init__(
-        self, link: SerialLink, servo: int, calibration: UsbServoSpec, travel_time: timedelta
+        self,
+        link: SerialLink,
+        servo: int,
+        calibration: UsbServoSpec,
+        travel_time: timedelta,
+        store: ServoPositionStore | None = None,
     ) -> None:
+        self._store = store
+        self._direction: MotorDirection | None = None
         self._link = link
         self._servo = servo
         self._calibration = calibration
@@ -243,6 +289,7 @@ class SerialServoDriver(ActuatorDriver):
     def start(self, direction: MotorDirection) -> None:
         spin = self._calibration.spin
         if spin is not None:
+            self._direction = direction
             pulse_us, duration_ms = spin.pulse_and_time(direction)
             try:
                 self._link.spin_servo(self._servo, pulse_us, duration_ms)
@@ -263,7 +310,16 @@ class SerialServoDriver(ActuatorDriver):
 
     def limit_reached_after(self, travelled: timedelta) -> bool:
         if self._calibration.spin is not None:
-            return self._spinning and self._link.spin_finished(self._servo)
+            finished = self._spinning and self._link.spin_finished(self._servo)
+            if finished and self._store is not None and self._direction is not None:
+                status = (
+                    ValveStatus.OPEN
+                    if self._direction is MotorDirection.OPEN
+                    else ValveStatus.CLOSED
+                )
+                self._store.save(self._servo, status)
+                self._direction = None
+            return finished
         reached = self._target is not None and self._link.reached(self._servo, self._target)
         if reached and not self._calibration.hold_torque_after_move and not self._released:
             self._released = _release_quietly(self._link, self._servo)
@@ -332,13 +388,20 @@ def build_usb_maqueta_device(  # noqa: PLR0913 - each parameter is one injected 
     _release_after_reaching(
         link, loose, spec.valve.max_travel_seconds, sleeper, spec.timing.tick_seconds
     )
-    return assemble_maqueta_device(
+    store = None if spec.state_file is None else ServoPositionStore(spec.state_file)
+    device = assemble_maqueta_device(
         SerialLevelSource(link, spec.sensor),
         spec,
         identities,
         http,
-        lambda index: SerialServoDriver(link, index + 1, spec.servos[index], travel),
+        lambda index: SerialServoDriver(link, index + 1, spec.servos[index], travel, store),
         clock=clock,
         sleeper=sleeper,
         point_id_factory=point_id_factory,
     )
+    if store is not None:
+        known = store.load()
+        for index, outlet in enumerate(device.outlets):
+            if spec.servos[index].spin is not None and known.get(index + 1) is ValveStatus.OPEN:
+                outlet.actuator.restore(ValveActuatorState(ValveStatus.OPEN, timedelta(0)))
+    return device
