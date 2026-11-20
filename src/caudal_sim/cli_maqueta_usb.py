@@ -30,7 +30,10 @@ from caudal_sim.maqueta_usb import (
 from caudal_sim.offline_buffer import BufferFullError
 from caudal_sim.serial_link import (
     MAX_ANGLE_DEG,
+    MAX_SPIN_MS,
+    MAX_SPIN_PULSE_US,
     MIN_ANGLE_DEG,
+    MIN_SPIN_PULSE_US,
     SerialLink,
     SerialLinkError,
     list_serial_ports,
@@ -142,6 +145,40 @@ def servo(
         link.move_servo(number, angle)
         _wait_servo(link, number, angle)
         typer.echo(f"Servo {number} en {angle} grados.")
+    except SerialLinkError as error:
+        raise _fail(error) from error
+    finally:
+        link.close()
+
+
+@usb_app.command("girar")
+def spin(
+    number: Annotated[int, typer.Argument(help="Servo 1 o 2.", min=1, max=2)],
+    pulse_us: Annotated[
+        int,
+        typer.Argument(
+            help="Pulso en microsegundos: ~1500 quieto; más arriba gira en un sentido y más "
+            "abajo en el otro.",
+            min=MIN_SPIN_PULSE_US,
+            max=MAX_SPIN_PULSE_US,
+        ),
+    ],
+    duration_ms: Annotated[
+        int, typer.Argument(help="Milisegundos de giro.", min=1, max=MAX_SPIN_MS)
+    ],
+    *,
+    config: ConfigOption = DEFAULT_USB_CONFIG,
+    port: PortOption = None,
+) -> None:
+    """Gira un servo de rotación continua (360°) por tiempo, para calibrar open_ms y close_ms."""
+    spec = _spec_or_exit(config)
+    link = _link_or_exit(spec, port)
+    try:
+        link.spin_servo(number, pulse_us, duration_ms)
+        end = time.monotonic() + duration_ms / 1000 + SERVO_SETTLE_SECONDS
+        while not link.spin_finished(number) and time.monotonic() < end:
+            link.ping()
+        typer.echo(f"Servo {number} giró {duration_ms} ms con pulso de {pulse_us} µs.")
     except SerialLinkError as error:
         raise _fail(error) from error
     finally:
