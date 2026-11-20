@@ -20,8 +20,20 @@ sensor:
 
 servos:
   # open_deg deja la manguera libre; closed_deg la pisa. Suposición: medir con `calibrar`.
-  - {name: Salida 1, open_deg: 90, closed_deg: 0, hold_torque_after_move: false}
-  - {name: Salida 2, open_deg: 90, closed_deg: 0, hold_torque_after_move: false}
+  # Los dos MG90S de la maqueta son de rotación continua (360°): abren y cierran girando por
+  # tiempo (bloque spin) y open_deg/closed_deg no se usan. Calibrado en banco el 2026-11-20 con
+  # `caudal-sim maqueta-usb girar <n> <us> <ms>`: 2000 µs durante 300 ms da un cuarto de vuelta;
+  # al cerrar el giro es más rápido, por eso dura menos.
+  - name: Salida 1
+    open_deg: 90
+    closed_deg: 0
+    hold_torque_after_move: false
+    spin: {open_us: 2000, close_us: 1000, open_ms: 300, close_ms: 240}
+  - name: Salida 2
+    open_deg: 90
+    closed_deg: 0
+    hold_torque_after_move: false
+    spin: {open_us: 2000, close_us: 1000, open_ms: 300, close_ms: 240}
 
 valve:
   # Tiempo nominal de maniobra del servo (el UNO lo mueve a 1 grado cada 8 ms).
