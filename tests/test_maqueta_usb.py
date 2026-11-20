@@ -66,6 +66,8 @@ class FakeUno:
             if self.servo_answers:
                 self.angles[number] = angle
                 self._say(f"DONE S{number} {angle}")
+        elif command.startswith("R"):
+            self._say(f"OK R{int(command[1])}")
         else:
             self._say("ERR comando desconocido")
 
@@ -164,11 +166,60 @@ def test_the_calibration_survives_a_save_and_a_load(tmp_path: Path) -> None:
     assert load_usb_spec(target) == changed
 
 
-def _device(setup: MaquetaSetup, uno: FakeUno, clock: StepClock) -> MaquetaDevice:
+def _device(
+    setup: MaquetaSetup, uno: FakeUno, clock: StepClock, *, hold_torque: bool | None = None
+) -> MaquetaDevice:
     http = httpx.Client(base_url=BASE_URL, transport=setup.api.transport())
+    spec = load_usb_spec(CONFIG)
+    if hold_torque is not None:
+        servos = tuple(
+            servo.model_copy(update={"hold_torque_after_move": hold_torque})
+            for servo in spec.servos
+        )
+        spec = spec.model_copy(update={"servos": servos})
     return build_usb_maqueta_device(
-        load_usb_spec(CONFIG), setup.identities, http, _link(uno), clock=clock, sleeper=clock.sleep
+        spec, setup.identities, http, _link(uno), clock=clock, sleeper=clock.sleep
     )
+
+
+def _open_command_setup(command_id: str) -> MaquetaSetup:
+    setup = make_setup()
+    setup.api.commands[str(VALVE_1_DEVICE)] = [
+        command_item(
+            command_id,
+            VALVE_1,
+            "OPEN",
+            START - timedelta(minutes=1),
+            START + timedelta(minutes=30),
+        )
+    ]
+    return setup
+
+
+def test_a_loose_servo_is_released_at_start_and_after_reaching_its_angle() -> None:
+    setup = _open_command_setup("0190f3a2-7777-7000-8000-000000000041")
+    uno = FakeUno()
+    device = _device(setup, uno, StepClock(START), hold_torque=False)
+
+    assert {"R1", "R2"} <= set(uno.written)
+    released_at_start = uno.written.count("R1")
+
+    device.run(seconds=OPEN_RUN_SECONDS)
+
+    assert uno.angles[1] == load_usb_spec(CONFIG).servos[0].open_deg
+    assert uno.written.count("R1") == released_at_start + 1
+    assert setup.api.acks[-1]["payload"]["result"] == "ACKED"
+
+
+def test_a_servo_that_holds_torque_is_never_released() -> None:
+    setup = _open_command_setup("0190f3a2-7777-7000-8000-000000000042")
+    uno = FakeUno()
+    device = _device(setup, uno, StepClock(START), hold_torque=True)
+
+    device.run(seconds=OPEN_RUN_SECONDS)
+
+    assert not any(command.startswith("R") for command in uno.written)
+    assert setup.api.acks[-1]["payload"]["result"] == "ACKED"
 
 
 def test_the_bridge_closes_both_servos_at_start() -> None:

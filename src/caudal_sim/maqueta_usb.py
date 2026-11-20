@@ -91,6 +91,13 @@ class UsbServoSpec(BaseModel):
     name: str = Field(min_length=1)
     open_deg: int = Field(ge=MIN_ANGLE_DEG, le=MAX_ANGLE_DEG, description="Manguera libre.")
     closed_deg: int = Field(ge=MIN_ANGLE_DEG, le=MAX_ANGLE_DEG, description="Manguera pisada.")
+    hold_torque_after_move: bool = Field(
+        default=True,
+        description=(
+            "Si es falso, el servo se suelta (R<n>) al llegar al ángulo, para que no siga "
+            "empujando contra la manguera o el tope."
+        ),
+    )
 
     @model_validator(mode="after")
     def _angles_differ(self) -> Self:
@@ -181,6 +188,7 @@ class SerialServoDriver(ActuatorDriver):
         self._calibration = calibration
         self._travel_time = travel_time
         self._target: int | None = None
+        self._released = False
 
     @property
     def travel_time(self) -> timedelta:
@@ -188,6 +196,7 @@ class SerialServoDriver(ActuatorDriver):
 
     def start(self, direction: MotorDirection) -> None:
         self._target = self._calibration.angle_for(direction)
+        self._released = False
         try:
             self._link.move_servo(self._servo, self._target)
         except SerialLinkError:
@@ -198,7 +207,45 @@ class SerialServoDriver(ActuatorDriver):
         return
 
     def limit_reached_after(self, travelled: timedelta) -> bool:
-        return self._target is not None and self._link.reached(self._servo, self._target)
+        reached = self._target is not None and self._link.reached(self._servo, self._target)
+        if reached and not self._calibration.hold_torque_after_move and not self._released:
+            self._released = _release_quietly(self._link, self._servo)
+        return reached
+
+
+def _release_quietly(link: SerialLink, servo: int) -> bool:
+    """Lets a servo go after it reached its angle. A failed release only means it keeps
+    holding, which is the safe side, so it is not an error of the command."""
+    try:
+        link.release_servo(servo)
+    except SerialLinkError:
+        return False
+    return True
+
+
+def _release_after_reaching(
+    link: SerialLink,
+    targets: dict[int, int],
+    max_wait_seconds: float,
+    sleeper: Callable[[float], None],
+    poll_seconds: float,
+) -> None:
+    """At start-up, waits for each servo that should not hold torque to reach its closed angle
+    and releases it, up to `max_wait_seconds`."""
+    waited = 0.0
+    pending = dict(targets)
+    while pending and waited <= max_wait_seconds:
+        try:
+            link.ping()  # reading the answer also records the DONE lines that came before it
+        except SerialLinkError:
+            return
+        for servo, angle in list(pending.items()):
+            if link.reached(servo, angle):
+                _release_quietly(link, servo)
+                del pending[servo]
+        if pending:
+            sleeper(poll_seconds)
+            waited += poll_seconds
 
 
 def build_usb_maqueta_device(  # noqa: PLR0913 - each parameter is one injected collaborator
@@ -218,6 +265,14 @@ def build_usb_maqueta_device(  # noqa: PLR0913 - each parameter is one injected 
     travel = timedelta(seconds=spec.valve.travel_seconds)
     for number, servo in enumerate(spec.servos, start=1):
         link.move_servo(number, servo.closed_deg)
+    loose = {
+        number: servo.closed_deg
+        for number, servo in enumerate(spec.servos, start=1)
+        if not servo.hold_torque_after_move
+    }
+    _release_after_reaching(
+        link, loose, spec.valve.max_travel_seconds, sleeper, spec.timing.tick_seconds
+    )
     return assemble_maqueta_device(
         SerialLevelSource(link, spec.sensor),
         spec,
