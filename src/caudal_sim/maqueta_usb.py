@@ -41,7 +41,15 @@ from caudal_sim.maqueta_spec import (
     MaquetaTimingSpec,
     MaquetaValveSpec,
 )
-from caudal_sim.serial_link import MAX_ANGLE_DEG, MIN_ANGLE_DEG, SerialLink, SerialLinkError
+from caudal_sim.serial_link import (
+    MAX_ANGLE_DEG,
+    MAX_SPIN_MS,
+    MAX_SPIN_PULSE_US,
+    MIN_ANGLE_DEG,
+    MIN_SPIN_PULSE_US,
+    SerialLink,
+    SerialLinkError,
+)
 
 MILLIMETERS_PER_METER = 1000.0
 
@@ -83,6 +91,26 @@ class UsbSensorSpec(BaseModel):
         return min(max(level, 0.0), self.max_level_m)
 
 
+class UsbSpinSpec(BaseModel):
+    """Timed turn of a continuous-rotation (360-degree) servo, which has no position: the pulse
+    width sets speed and direction, and the time sets how far it turns. Each direction has its
+    own time because the two speeds of a servo are rarely equal."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    open_us: int = Field(ge=MIN_SPIN_PULSE_US, le=MAX_SPIN_PULSE_US, description="Pulso al abrir.")
+    close_us: int = Field(
+        ge=MIN_SPIN_PULSE_US, le=MAX_SPIN_PULSE_US, description="Pulso al cerrar."
+    )
+    open_ms: int = Field(ge=1, le=MAX_SPIN_MS, description="Tiempo de giro al abrir.")
+    close_ms: int = Field(ge=1, le=MAX_SPIN_MS, description="Tiempo de giro al cerrar.")
+
+    def pulse_and_time(self, direction: MotorDirection) -> tuple[int, int]:
+        if direction is MotorDirection.OPEN:
+            return self.open_us, self.open_ms
+        return self.close_us, self.close_ms
+
+
 class UsbServoSpec(BaseModel):
     """Calibration of one servo that pinches the hose of an outlet."""
 
@@ -91,6 +119,13 @@ class UsbServoSpec(BaseModel):
     name: str = Field(min_length=1)
     open_deg: int = Field(ge=MIN_ANGLE_DEG, le=MAX_ANGLE_DEG, description="Manguera libre.")
     closed_deg: int = Field(ge=MIN_ANGLE_DEG, le=MAX_ANGLE_DEG, description="Manguera pisada.")
+    spin: UsbSpinSpec | None = Field(
+        default=None,
+        description=(
+            "Servo de rotación continua (360°): abre y cierra girando por tiempo. Con este "
+            "bloque, open_deg y closed_deg no se usan."
+        ),
+    )
     hold_torque_after_move: bool = Field(
         default=True,
         description=(
@@ -120,6 +155,16 @@ class UsbMaquetaSpec(BaseModel):
     valve: MaquetaValveSpec
     timing: MaquetaTimingSpec
     buffer: MaquetaBufferSpec
+
+    @model_validator(mode="after")
+    def _spins_fit_the_travel(self) -> Self:
+        limit_ms = self.valve.max_travel_seconds * 1000
+        for servo in self.servos:
+            if servo.spin is not None and max(servo.spin.open_ms, servo.spin.close_ms) >= limit_ms:
+                raise ValueError(
+                    f"el giro de {servo.name} debe durar menos que valve.max_travel_seconds"
+                )
+        return self
 
 
 def load_usb_spec(path: Path) -> UsbMaquetaSpec:
@@ -189,12 +234,22 @@ class SerialServoDriver(ActuatorDriver):
         self._travel_time = travel_time
         self._target: int | None = None
         self._released = False
+        self._spinning = False
 
     @property
     def travel_time(self) -> timedelta:
         return self._travel_time
 
     def start(self, direction: MotorDirection) -> None:
+        spin = self._calibration.spin
+        if spin is not None:
+            pulse_us, duration_ms = spin.pulse_and_time(direction)
+            try:
+                self._link.spin_servo(self._servo, pulse_us, duration_ms)
+                self._spinning = True
+            except SerialLinkError:
+                self._spinning = False
+            return
         self._target = self._calibration.angle_for(direction)
         self._released = False
         try:
@@ -207,6 +262,8 @@ class SerialServoDriver(ActuatorDriver):
         return
 
     def limit_reached_after(self, travelled: timedelta) -> bool:
+        if self._calibration.spin is not None:
+            return self._spinning and self._link.spin_finished(self._servo)
         reached = self._target is not None and self._link.reached(self._servo, self._target)
         if reached and not self._calibration.hold_torque_after_move and not self._released:
             self._released = _release_quietly(self._link, self._servo)
@@ -264,11 +321,13 @@ def build_usb_maqueta_device(  # noqa: PLR0913 - each parameter is one injected 
         raise ValueError("hace falta una identidad por salida")
     travel = timedelta(seconds=spec.valve.travel_seconds)
     for number, servo in enumerate(spec.servos, start=1):
-        link.move_servo(number, servo.closed_deg)
+        # A 360-degree servo has no position to go back to: it is assumed closed as it stands.
+        if servo.spin is None:
+            link.move_servo(number, servo.closed_deg)
     loose = {
         number: servo.closed_deg
         for number, servo in enumerate(spec.servos, start=1)
-        if not servo.hold_torque_after_move
+        if servo.spin is None and not servo.hold_torque_after_move
     }
     _release_after_reaching(
         link, loose, spec.valve.max_travel_seconds, sleeper, spec.timing.tick_seconds

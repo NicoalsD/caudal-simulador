@@ -9,7 +9,9 @@ import pytest
 
 from caudal_sim.maqueta_device import MaquetaDevice
 from caudal_sim.maqueta_usb import (
+    UsbMaquetaSpec,
     UsbSensorSpec,
+    UsbSpinSpec,
     build_usb_maqueta_device,
     load_usb_spec,
     save_usb_spec,
@@ -36,6 +38,7 @@ class FakeUno:
         self.servo_answers = servo_answers
         self.written: list[str] = []
         self.angles = {1: -1, 2: -1}
+        self.spins: list[str] = []
         self._out: deque[bytes] = deque([b"READY caudal-uno 1.0.0\n"])
 
     def write(self, data: bytes, /) -> int:
@@ -68,6 +71,12 @@ class FakeUno:
                 self._say(f"DONE S{number} {angle}")
         elif command.startswith("R"):
             self._say(f"OK R{int(command[1])}")
+        elif command.startswith("T"):
+            number = int(command[1])
+            self._say(f"OK {command}")
+            if self.servo_answers:
+                self.spins.append(command)
+                self._say(f"DONE T{number}")
         else:
             self._say("ERR comando desconocido")
 
@@ -166,11 +175,27 @@ def test_the_calibration_survives_a_save_and_a_load(tmp_path: Path) -> None:
     assert load_usb_spec(target) == changed
 
 
+def _position_spec() -> UsbMaquetaSpec:
+    """The maqueta file with angle servos: the real maqueta uses 360-degree ones (spin), and
+    these tests cover both kinds."""
+    spec = load_usb_spec(CONFIG)
+    servos = tuple(servo.model_copy(update={"spin": None}) for servo in spec.servos)
+    return spec.model_copy(update={"servos": servos})
+
+
 def _device(
-    setup: MaquetaSetup, uno: FakeUno, clock: StepClock, *, hold_torque: bool | None = None
+    setup: MaquetaSetup,
+    uno: FakeUno,
+    clock: StepClock,
+    *,
+    hold_torque: bool | None = None,
+    spin: UsbSpinSpec | None = None,
 ) -> MaquetaDevice:
     http = httpx.Client(base_url=BASE_URL, transport=setup.api.transport())
-    spec = load_usb_spec(CONFIG)
+    spec = _position_spec()
+    if spin is not None:
+        servos = tuple(servo.model_copy(update={"spin": spin}) for servo in spec.servos)
+        spec = spec.model_copy(update={"servos": servos})
     if hold_torque is not None:
         servos = tuple(
             servo.model_copy(update={"hold_torque_after_move": hold_torque})
@@ -226,7 +251,7 @@ def test_the_bridge_closes_both_servos_at_start() -> None:
     uno = FakeUno()
     _device(make_setup(), uno, StepClock(START))
 
-    spec = load_usb_spec(CONFIG)
+    spec = _position_spec()
     assert uno.angles == {1: spec.servos[0].closed_deg, 2: spec.servos[1].closed_deg}
 
 
@@ -293,3 +318,65 @@ def test_a_reading_without_echo_sends_no_point_and_is_counted() -> None:
 
     assert setup.api.telemetry == []
     assert report.missed_readings == load_usb_spec(CONFIG).timing.telemetry_interval_seconds
+
+
+SPIN = UsbSpinSpec(open_us=1700, close_us=1300, open_ms=400, close_ms=450)
+
+
+def test_a_continuous_servo_is_not_moved_at_start() -> None:
+    uno = FakeUno()
+    _device(make_setup(), uno, StepClock(START), spin=SPIN)
+
+    assert not any(command.startswith(("S", "T")) for command in uno.written)
+
+
+def test_a_continuous_servo_opens_by_turning_for_its_time_and_is_acked() -> None:
+    setup = _open_command_setup("0190f3a2-7777-7000-8000-000000000043")
+    uno = FakeUno()
+    device = _device(setup, uno, StepClock(START), spin=SPIN)
+
+    device.run(seconds=OPEN_RUN_SECONDS)
+
+    assert uno.spins == ["T1 1700 400"]
+    assert device.outlets[0].actuator.status is ValveStatus.OPEN
+    assert setup.api.acks[-1]["payload"]["result"] == "ACKED"
+
+
+def test_a_continuous_servo_that_never_stops_ends_in_fault() -> None:
+    setup = _open_command_setup("0190f3a2-7777-7000-8000-000000000044")
+    uno = FakeUno()
+    device = _device(setup, uno, StepClock(START), spin=SPIN)
+    uno.servo_answers = False
+
+    device.run(seconds=load_usb_spec(CONFIG).valve.max_travel_seconds + OPEN_RUN_SECONDS)
+
+    assert device.outlets[0].actuator.status is ValveStatus.FAULT
+
+
+def test_a_spin_longer_than_the_travel_limit_is_rejected() -> None:
+    spec = load_usb_spec(CONFIG)
+    too_long = UsbSpinSpec(
+        open_us=1700, close_us=1300, open_ms=spec.valve.max_travel_seconds * 1000, close_ms=400
+    )
+    servos = tuple(servo.model_copy(update={"spin": too_long}) for servo in spec.servos)
+
+    with pytest.raises(ValueError, match="max_travel_seconds"):
+        type(spec).model_validate({**spec.model_dump(), "servos": [s.model_dump() for s in servos]})
+
+
+def test_the_link_spins_and_records_its_done_line() -> None:
+    uno = FakeUno()
+    link = _link(uno)
+
+    link.spin_servo(2, 1300, 250)
+    link.ping()
+
+    assert uno.written[-2] == "T2 1300 250"
+    assert link.spin_finished(2)
+    assert not link.spin_finished(1)
+
+
+def test_the_real_maqueta_turns_its_360_degree_servos_by_time() -> None:
+    spec = load_usb_spec(CONFIG)
+
+    assert all(servo.spin is not None for servo in spec.servos)
