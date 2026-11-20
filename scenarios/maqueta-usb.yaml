@@ -51,3 +51,5 @@ timing:
 buffer:
   capacity_batches: 500
   max_attempts: 5
+# Dónde guarda el puente si cada llave de 360° quedó abierta o cerrada (outputs/ no se versiona).
+state_file: outputs/maqueta-usb-state.json
