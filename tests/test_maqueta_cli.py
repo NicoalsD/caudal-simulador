@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from caudal_sim.cli import EXIT_CONFIG_ERROR, app
@@ -31,8 +32,10 @@ def test_the_command_is_listed_in_the_help() -> None:
     result = RUNNER.invoke(app, ["maqueta", "--help"])
 
     assert result.exit_code == 0
-    assert "--scenario" in result.output
-    assert "--api-url" in result.output
+    # In CI the help comes with colors, which split "--scenario" in two styled pieces.
+    help_text = unstyle(result.output)
+    assert "--scenario" in help_text
+    assert "--api-url" in help_text
 
 
 def test_a_missing_scenario_exits_with_a_configuration_error(clean_env: Path) -> None:
