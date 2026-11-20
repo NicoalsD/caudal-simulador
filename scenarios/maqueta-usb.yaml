@@ -20,8 +20,8 @@ sensor:
 
 servos:
   # open_deg deja la manguera libre; closed_deg la pisa. Suposición: medir con `calibrar`.
-  - {name: Salida 1, open_deg: 90, closed_deg: 0}
-  - {name: Salida 2, open_deg: 90, closed_deg: 0}
+  - {name: Salida 1, open_deg: 90, closed_deg: 0, hold_torque_after_move: false}
+  - {name: Salida 2, open_deg: 90, closed_deg: 0, hold_torque_after_move: false}
 
 valve:
   # Tiempo nominal de maniobra del servo (el UNO lo mueve a 1 grado cada 8 ms).
