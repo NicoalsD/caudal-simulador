@@ -60,7 +60,8 @@ class ValveCommandExecutor:
                 self._source.acknowledge(
                     command.command_id, AckResult.FAILED, SUPERSEDED_DETAIL, now
                 )
-        if winner is not None and winner is not self._in_flight:
+        # Equality, not identity: the HTTP source builds new objects on each poll.
+        if winner is not None and winner != self._in_flight:
             winner.execute(now, self._actuator)
             self._in_flight = winner
         self._publish_status_change(now)

@@ -4,6 +4,8 @@ Un escenario es un archivo YAML en `scenarios/` que declara **todos** los parám
 
 Especificación: [Datos simulados](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Datos-simulados.md). Operación en vivo: [operacion-live.md](operacion-live.md).
 
+**Alcance B2B (2026-11-20).** Los escenarios describen hoy el modelo anterior: sectores con horario de turnos, reportes de daño de las familias y una Junta que aprueba. En el modelo B2B los sectores pasan a líneas de servicio, los turnos y los reportes públicos salen del producto, y los escenarios alimentan instituciones simuladas (`is_simulated`). La reescritura de los YAML queda por definir. Los valores de esta página son los del código actual.
+
 ## 1. Supuestos: valores que no salen de una medición
 
 Ningún valor de los escenarios se midió en Guaitarilla. Los YAML lo marcan en sus comentarios, en inglés como todo el código, con la fórmula **"Assumption, verify"** (supuesto, verificar), casi siempre con la fuente con la que habría que contrastarlo: IDEAM o una estación cercana para el clima, un aforo para la fuente, un censo local para los hogares, la norma RAS 0330/2017 para la dotación, la Junta para el horario y los registros de reparación para las fugas. Los ajustes hechos solo para la presentación se marcan como **"Presentation setting, not a measurement"**.
@@ -76,7 +78,7 @@ uv run caudal-sim generate --scenario rainy-year --days 365
 
 **Parámetros clave.** Solo cambia `leaks`: `rate_per_month: 4.0` (cinco veces la línea base) y `report_probability_per_day: 0.5`. El clima es el de `normal-year`. Supuesto, verificar con el historial del acueducto.
 
-**Qué produce.** Más fugas que el año normal (lo verifica `test_frequent_leaks_produce_more_leaks_than_the_normal_year`), cada una de `0.3` m³/h durante 1 a 5 días, y más reportes de daño de las familias en `observed/damage_reports`.
+**Qué produce.** Más fugas que el año normal (lo verifica `test_frequent_leaks_produce_more_leaks_than_the_normal_year`), cada una de `0.3` m³/h durante 1 a 5 días, y más reportes de daño de las familias en `observed/damage_reports` (los reportes públicos salen del producto B2B: por definir).
 
 ```bash
 uv run caudal-sim generate --scenario frequent-leaks --days 365
@@ -110,7 +112,7 @@ Las horas cuentan desde el inicio de la corrida, salvo `damage_report_hour_of_da
 uv run caudal-sim demo --start 2026-10-10
 ```
 
-`demo` usa `presentation` y 3 días por defecto. Necesita el acueducto demo, las cuentas y la clave del nodo (ver [operacion-live.md](operacion-live.md#2-requisitos)). Para ver solo los datos sin contactar el backend:
+`demo` usa `presentation` y 3 días por defecto. Necesita una institución simulada, las cuentas y la clave del nodo (ver [operacion-live.md](operacion-live.md#2-requisitos)). Para ver solo los datos sin contactar el backend:
 
 ```bash
 uv run caudal-sim generate --scenario presentation --days 3
@@ -123,11 +125,12 @@ Todos aceptan `--scenario` con el nombre del archivo (`scenarios/<nombre>.yaml`)
 | Comando | Qué hace | Días por defecto |
 |---|---|---|
 | `uv run caudal-sim generate` | Escribe `truth/` (lluvia diaria, serie horaria, fugas), `observed/` (lecturas, ejecuciones de turnos, reportes de daño) y `manifest.json` en `--out` (por defecto `outputs`). `--format csv`, `parquet` o `both` (por defecto). No envía nada. | 365 |
-| `uv run caudal-sim export-actas` | Exporta las ejecuciones de turnos confirmadas para las actas. | 365 |
+| `uv run caudal-sim export-actas` | Exporta las ejecuciones de turnos confirmadas para las actas. (Por definir en B2B: las actas se armarán con lecturas, eventos, comandos y cierres.) | 365 |
 | `uv run caudal-sim export-backtest` | Exporta ventanas históricas para el backtest de la IA. | 365 |
-| `uv run caudal-sim backfill readings`, `shift-executions` o `incidents` | Importa el historial simulado al acueducto demo. `--dry-run` cuenta los lotes sin contactar la API, pero igual necesita las variables de `.env` (ver [despliegue.md](despliegue.md#4-variables-de-entorno)). | 90 |
-| `uv run caudal-sim live` | Simula en tiempo real y envía los datos al acueducto demo. Acepta `--start AAAA-MM-DD`. | 1 |
-| `uv run caudal-sim demo` | Guion de demostración. Exige la sección `demo`. | 3 |
+| `uv run caudal-sim backfill readings`, `shift-executions` o `incidents` | Importa el historial simulado a la institución simulada indicada. `backfill shift-executions` e `incidents` dependen de turnos y de reportes de daño, que salen del producto B2B (por definir). `--dry-run` cuenta los lotes sin contactar la API, pero igual necesita las variables de `.env` (ver [despliegue.md](despliegue.md#4-variables-de-entorno)). | 90 |
+| `uv run caudal-sim live` | Simula en tiempo real y envía los datos a la institución simulada. Acepta `--start AAAA-MM-DD`. | 1 |
+| `uv run caudal-sim demo` | Guion de demostración. Exige la sección `demo`. Por definir en B2B: el guion usa lecturas, reporte público y la aprobación de la Junta. | 3 |
+| `uv run caudal-sim maqueta` | Corre la maqueta virtual con `scenarios/maqueta.yaml`. Usa su propio formato (sin clima ni consumo), no `Scenario`. Ver [operacion-live.md](operacion-live.md#7-maqueta-virtual-caudal-sim-maqueta). | sin límite (`--seconds`) |
 
 Ejemplo con otra semilla y salida solo en CSV:
 

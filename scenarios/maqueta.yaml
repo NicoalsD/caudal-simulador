@@ -1,0 +1,54 @@
+# Virtual maqueta: one tank with a feed pump, a high float switch and two outlets of 1/4".
+# Read by `caudal-sim maqueta`. The data it produces is SIMULATED.
+# All parameters live here; the code has no business values.
+# Values marked "assumption, verify" do not come from measurement of the physical maqueta.
+
+meta:
+  name: maqueta
+  description: Maqueta virtual de un tanque con bomba, flotador y dos salidas. Datos simulados.
+  simulated: true
+
+tank:
+  # Cross-section area, in m². Assumption, verify with the physical tank.
+  area_m2: 0.07
+  # Physical height of the tank, in meters.
+  height_m: 0.35
+  # Height of the overflow pipe (rebose), in meters. Water above it leaves through the overflow.
+  overflow_m: 0.32
+  # Level when the device starts, in meters. Assumption, verify.
+  initial_level_m: 0.10
+  # High float: it cuts the pump when the level reaches this height, in meters.
+  float_high_m: 0.30
+  # The pump starts again only under this level (hysteresis, so the pump does not chatter).
+  float_restart_m: 0.26
+
+pump:
+  # Feed flow of the pump while it runs, in liters per minute.
+  flow_l_per_min: 4.0
+
+outlets:
+  # Two outlets of 1/4 inch at the bottom. Discharge coefficient 0.6 is a typical value for
+  # a sharp-edged orifice. Assumption, verify with a flow measurement.
+  - {name: Salida 1, diameter_in: 0.25, discharge_coefficient: 0.6}
+  - {name: Salida 2, diameter_in: 0.25, discharge_coefficient: 0.6}
+
+valve:
+  # Seconds the outlet valve takes to go from one limit switch to the other. Assumption, verify.
+  travel_seconds: 3
+  # Seconds after which the valve stops and reports FAULT. Assumption, verify.
+  max_travel_seconds: 6
+
+timing:
+  # Physics step and loop period, in seconds. The model integrates one step per tick.
+  tick_seconds: 1.0
+  # How often the level is sent to the API, in seconds. Batches the points of the ticks in between.
+  telemetry_interval_seconds: 10
+  # How often each valve asks the API for its commands, in seconds. The API allows 60 requests a
+  # minute per device, so the poll is not made every tick.
+  command_poll_seconds: 2
+
+buffer:
+  # Telemetry batches kept while the network is down. Assumption, verify with the device's memory.
+  capacity_batches: 500
+  # Passes of the retry loop before the batches wait for the next cycle. Assumption, verify.
+  max_attempts: 5

@@ -110,3 +110,45 @@ class LiveSettings(BaseSettings):
         ge=0,
         description="Segundos reales por hora simulada a velocidad 1.",
     )
+
+
+MAQUETA_ENV_PREFIX = "CAUDAL_SIM_MAQUETA_"
+DEFAULT_MAQUETA_KEY_DIR = Path("keys")
+
+
+class MaquetaSettings(BaseSettings):
+    """Identities of the virtual maqueta: one signed sensor and one signed actuator per outlet.
+
+    Each identity is a device already registered in the backend, with its own public key. Its
+    private key lives in `keys/` (git-ignored) or in the path given here. Nothing is hardcoded.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix=MAQUETA_ENV_PREFIX,
+        env_file=ENV_FILE,
+        extra="ignore",
+    )
+
+    api_base_url: str = Field(min_length=1, description="URL base de caudal-backend.")
+    http_timeout_seconds: float = Field(
+        default=DEFAULT_TIMEOUT_SECONDS,
+        ge=MIN_TIMEOUT_SECONDS,
+        description="Tiempo máximo de cada petición a la API, en segundos.",
+    )
+    sensor_device_id: UUID = Field(description="Dispositivo LEVEL_SENSOR del tanque.")
+    sensor_private_key_path: Path = Field(
+        default=DEFAULT_MAQUETA_KEY_DIR / "maqueta-sensor.pem",
+        description="Clave privada Ed25519 del sensor, fuera de git.",
+    )
+    valve_1_device_id: UUID = Field(description="Dispositivo VALVE_ACTUATOR de la salida 1.")
+    valve_1_valve_id: UUID = Field(description="Válvula que mueve la salida 1.")
+    valve_1_private_key_path: Path = Field(
+        default=DEFAULT_MAQUETA_KEY_DIR / "maqueta-valve-1.pem",
+        description="Clave privada Ed25519 del actuador de la salida 1, fuera de git.",
+    )
+    valve_2_device_id: UUID = Field(description="Dispositivo VALVE_ACTUATOR de la salida 2.")
+    valve_2_valve_id: UUID = Field(description="Válvula que mueve la salida 2.")
+    valve_2_private_key_path: Path = Field(
+        default=DEFAULT_MAQUETA_KEY_DIR / "maqueta-valve-2.pem",
+        description="Clave privada Ed25519 del actuador de la salida 2, fuera de git.",
+    )
