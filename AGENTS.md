@@ -11,16 +11,16 @@ Reglas obligatorias para cualquier persona o agente de IA que trabaje en este re
 
 ## 1. Qué es CAUDAL y qué hace este repo
 
-CAUDAL es "el cuaderno del acueducto, pero digital" para las veredas de Guaitarilla (Nariño): registra lecturas del tanque, pronostica el nivel, propone turnos explicados que aprueba la Junta y publica el horario sin datos personales. Visión completa: [Caudal.md](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Caudal.md).
+CAUDAL es un producto B2B para instituciones que almacenan agua en un tanque y la reparten por válvulas. Este simulador produce datos y hardware de prueba para ellas. Visión completa: [Caudal.md](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Caudal.md).
 
-Simulador virtual del acueducto (gemelo digital) en **Python 3.12**: como no hay datos reales de la región, genera lo que llegaría del campo (clima, fuente, tanque, consumo por sector, fugas, fontanero con errores humanos, sensores con fallas, válvulas motorizadas y reportes de la comunidad) y lo envía al backend **por las mismas puertas que usaría la realidad**. Incluye un tablero web.
+Simulador en **Python 3.12** de datos y hardware para CAUDAL B2B. Como no hay datos reales de clientes, genera datos simulados (clima, fuente, tanque, consumo por línea de servicio, fugas, operador con errores humanos, sensores con fallas y válvulas motorizadas) y los envía al backend **por las mismas puertas que usaría la realidad**, a instituciones simuladas. Incluye un tablero web y el puente USB de la maqueta física (`maqueta-usb`).
 
 Especificación canónica (ya escrita en el backend): [Datos simulados](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Datos-simulados.md), [Simulador y hardware](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Simulador-y-hardware.md) y [Protocolo de dispositivos](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Protocolo-de-dispositivos.md).
 
 | Repositorio | Contenido |
 |---|---|
 | [`caudal-backend`](https://github.com/NicoalsD/caudal-backend) | API Java, base de datos, seguridad y documentación canónica |
-| [`caudal-frontend`](https://github.com/NicoalsD/caudal-frontend) | PWA del fontanero, panel de la Junta y página pública |
+| [`caudal-frontend`](https://github.com/NicoalsD/caudal-frontend) | Panel web por institución (PWA) |
 | [`caudal-ia`](https://github.com/NicoalsD/caudal-ia) | Pronóstico con Chronos |
 | [`caudal-simulador`](https://github.com/NicoalsD/caudal-simulador) | Simulador de datos de la región y del hardware |
 
@@ -39,8 +39,8 @@ Solo esas tres cuentas. Cambio de cuenta, ramas, commits y PR: [`.agents/workflo
 - **Commits:** `tipo: descripción` en español, minúscula, máximo 72 caracteres; tipos `feat`, `fix`, `hotfix`, `docs`, `test`, `refactor`, `style`, `perf`, `build`, `ci`, `chore`, `revert`. Un commit por unidad lógica. Hook: `git config core.hooksPath .githooks`.
 - **Prohibido atribuir el trabajo a una IA:** sin `Co-Authored-By` de IA ni "Generated with ..." en commits, PR ni releases.
 - **Pull requests:** todo PR se fusiona en cuanto sus checks estén en verde, con merge commit y con la cuenta de su autor (`gh auth switch` a esa cuenta antes de `gh pr merge`); ningún agente deja PR abiertos. Pasos: [`.agents/workflow.md`](.agents/workflow.md#4-pull-requests-y-fusión-obligatorio).
-- **Sin valores quemados:** parámetros en variables de entorno (pydantic-settings) documentadas en `.env.example` y escenarios en YAML; Ruff `PLR2004` activo. Los parámetros de negocio del acueducto vienen del backend.
-- **Seguridad:** Las contraseñas de los usuarios simulados, el token y las claves privadas Ed25519 van solo en `.env` o en `keys/` (ignorados por git), nunca en los YAML; los datos son siempre simulados y se marcan así; la importación solo funciona en el acueducto demo. Política: [SECURITY.md](SECURITY.md) y [Seguridad](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Seguridad.md).
+- **Sin valores quemados:** parámetros en variables de entorno (pydantic-settings) documentadas en `.env.example` y escenarios en YAML; Ruff `PLR2004` activo. Los parámetros de negocio de cada institución vienen del backend.
+- **Seguridad:** Las contraseñas de los usuarios simulados, el token y las claves privadas Ed25519 van solo en `.env` o en `keys/` (ignorados por git), nunca en los YAML; los datos son siempre simulados y se marcan así; la importación solo funciona en instituciones simuladas (`is_simulated`). Política: [SECURITY.md](SECURITY.md) y [Seguridad](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Seguridad.md).
 - **Patrones de diseño explícitos** aunque Python ya traiga algo parecido (`@decorator`, generadores, módulos): `SimulationClock` (Singleton), `DeviceCreator` (Factory Method), `DeviceKitFactory` (Abstract Factory), `ScenarioBuilder` (Builder), `ApiPayloadAdapter` (Adapter), `ValveActuator` × `ActuatorDriver` (Bridge), `NoisySensor`/`StuckSensor`/`DriftingSensor` (Decorator), `OfflineBufferTransport` (Proxy), `OpenValveCommand` (Command), `EventScheduleIterator` (Iterator), `SimulationSnapshot` (Memento), `SimulationEventBus` (Observer), `ValveState` (State), `WeatherGenerator` y `ReadingErrorModel` (Strategy), `SimulationStep` (Template Method). Catálogo: [Patrones de diseño](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Patrones-de-diseno.md).
 - **Diagramas** con draw.io (MCP y sus iconos): `.drawio` + `.png` en `docs/images/`.
 

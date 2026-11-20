@@ -4,22 +4,24 @@ Este documento explica cómo correr el simulador en tiempo real (`caudal-sim liv
 
 Especificación: [Datos simulados](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Datos-simulados.md), secciones 5 y 6.
 
+**Alcance B2B (2026-11-20).** Este documento describe la operación actual, contra el acueducto demo. En el modelo B2B el destino es una institución simulada (`is_simulated`), el guion y los comandos de Junta y de lecturas manuales salen del producto, y la maqueta física pasa al puente `maqueta-usb`. Lo nuevo se marca como *por implementar* o *por definir*.
+
 ## 1. Qué hace y qué no hace
 
 | Sí hace | No hace |
 |---|---|
-| Avanza el reloj simulado hora por hora, a la velocidad que pida el tablero. | No ejecuta comandos de válvula: `live` reproduce la simulación ya calculada y no consulta `GET /devices/commands`. Los comandos los ejecuta la maqueta (sección 7). Ningún turno se mueve sin aprobación de la Junta. |
-| Envía la lectura del sensor de nivel como **telemetría firmada** (Ed25519) a `POST /api/v1/devices/telemetry`. | No propone turnos ni los aprueba, salvo con `--auto-junta` en corridas largas. |
-| Envía las **lecturas** del fontanero simulado a `POST /api/v1/readings` con la cuenta OPERATOR. | Los comandos de válvula no pasan por `live`: ver la maqueta virtual, sección 7. |
+| Avanza el reloj simulado hora por hora, a la velocidad que pida el tablero. | No ejecuta comandos de válvula: `live` reproduce la simulación ya calculada y no consulta `GET /devices/commands`. Los comandos los ejecuta la maqueta (sección 7). Los turnos salen del producto B2B (por definir). |
+| Envía la lectura del sensor de nivel como **telemetría firmada** (Ed25519) a `POST /api/v1/devices/telemetry`. | No propone turnos ni los aprueba (los turnos salen del producto B2B). |
+| Envía las **lecturas** del fontanero simulado a `POST /api/v1/readings` con la cuenta OPERATOR. Hoy; el endpoint sale del producto B2B (por definir). | Los comandos de válvula no pasan por `live`: ver la maqueta virtual, sección 7. |
 | Guarda la telemetría sin señal y la envía después con su hora original. | No inventa datos reales: todo sale del escenario y de la semilla. |
-| Publica su estado y sus eventos en el tablero local (`http://127.0.0.1:8000`). | No se conecta a ningún acueducto que no tenga `is_demo = true`. |
+| Publica su estado y sus eventos en el tablero local (`http://127.0.0.1:8000`). | No se conecta a ninguna institución que no tenga `is_simulated = true` (hoy la columna se llama `is_demo`). |
 
-La Junta es una **persona** en el frontend. Las propuestas esperan a que alguien las apruebe allí. `--auto-junta` solo aprueba las que estén pendientes, con una cuenta simulada de la Junta, y deja la aprobación marcada como simulada.
+En el modelo B2B no hay Junta ni propuestas de turnos. Este párrafo describe la operación actual y se reescribe con el guion (por definir).
 
 ## 2. Requisitos
 
-1. **Acueducto demo en el backend.** El simulador revisa antes de enviar nada que el acueducto del slug `CAUDAL_SIM_DEMO_AQUEDUCT_SLUG` tenga `is_demo = true`. Si no, cancela con un mensaje en español y no envía nada.
-2. **Cuentas.** `CAUDAL_SIM_API_USERNAME` (PROJECT_TEAM) para el historial, `CAUDAL_SIM_LIVE_OPERATOR_USERNAME` (OPERATOR) para las lecturas y, solo para `--auto-junta`, `CAUDAL_SIM_LIVE_BOARD_USERNAME` (Junta). Las contraseñas van en `.env`.
+1. **Institución simulada en el backend** (hoy, acueducto demo). El simulador revisa antes de enviar nada que la institución del slug `CAUDAL_SIM_DEMO_AQUEDUCT_SLUG` tenga `is_demo = true` (B2B: `is_simulated = true`). Si no, cancela con un mensaje en español y no envía nada.
+2. **Cuentas.** `CAUDAL_SIM_API_USERNAME` (hoy PROJECT_TEAM; en B2B, PLATFORM_ADMIN, porque la importación pasa al superadmin) para el historial, `CAUDAL_SIM_LIVE_OPERATOR_USERNAME` (OPERATOR) para las lecturas (por definir en B2B) y, solo para `--auto-junta`, `CAUDAL_SIM_LIVE_BOARD_USERNAME` (Junta; sale del producto B2B). Las contraseñas van en `.env`.
 3. **Dispositivo registrado.** El nodo de nivel simulado existe en el backend con su clave pública registrada (ver [Claves y secretos](claves-y-secretos.md)).
 4. **Clave privada** en `keys/ed25519-private.pem` (o la ruta de `CAUDAL_SIM_PRIVATE_KEY_PATH`).
 5. **Reloj simulado cercano a hoy.** La API rechaza lecturas más viejas que `max_backdate_days` con `422 TOO_OLD`. Por eso `live` acepta `--start AAAA-MM-DD`. Usa la fecha siguiente al último día del historial que cargaste con `backfill`.
@@ -33,7 +35,7 @@ uv run caudal-sim live --scenario normal-year --start 2026-10-10
 # Corrida corta sin tablero, para pruebas
 uv run caudal-sim live --scenario normal-year --max-hours 24 --sin-tablero
 
-# Corrida larga con la Junta simulada (solo corridas largas)
+# Corrida larga con la Junta simulada (por definir en B2B: la Junta sale del producto)
 uv run caudal-sim live --scenario normal-year --days 30 --auto-junta
 
 # Guion de demostración (escenario presentation, 3 días)
@@ -50,7 +52,7 @@ uv run caudal-sim tablero
 | `--seed` | Semilla. Con la misma semilla y escenario, los datos son idénticos. |
 | `--start` | Fecha del reloj simulado. Ver el requisito 5. |
 | `--max-hours` | Detiene la corrida tras esas horas simuladas. |
-| `--auto-junta` | Aprueba las propuestas pendientes con la Junta simulada. |
+| `--auto-junta` | Aprueba las propuestas pendientes con la Junta simulada. Por definir en B2B. |
 | `--tablero` / `--sin-tablero` | Levanta o no la API del tablero junto a la simulación. |
 
 Comando de la maqueta virtual (sección 7):
@@ -78,7 +80,7 @@ El tablero se sirve desde la misma API, en `http://127.0.0.1:8000`:
 
 ## 5. Guion `demo`
 
-El guion corre sobre el escenario `presentation` (tres días, semilla fija) y ejecuta los fallos de la especificación en horas fijas del YAML (sección `demo:`):
+El guion corre sobre el escenario `presentation` (tres días, semilla fija) y ejecuta los fallos de la especificación en horas fijas del YAML (sección `demo:`). Por definir en B2B: los pasos que usan lecturas, reporte público y Junta dependen de funciones que salen del producto.
 
 | Paso | Hora | Qué envía | Resultado esperado |
 |---|---|---|---|
@@ -86,9 +88,9 @@ El guion corre sobre el escenario `presentation` (tres días, semilla fija) y ej
 | Lectura corregida | 9 | La lectura con el valor corregido. | Se guarda (201). |
 | Agua con barro | 10 | Lectura con el código `MUDDY` y una nota. | Se guarda (201). |
 | Sensor sin señal | 12 | El sensor deja de enviar durante seis horas. | Al volver, la telemetría llega con su hora original. |
-| Fuga reportada | 63 | Un reporte de la familia por el formulario público, con código de seguimiento. | Se registra (201). |
+| Fuga reportada | 63 | Un reporte de la familia por el formulario público, con código de seguimiento (el reporte público sale del producto B2B: por definir). | Se registra (201). |
 
-Después vienen cuatro pasos **manuales** (IA caída, propuesta y decisión de la Junta, publicación y cierre del día con acta). El simulador no los controla, así que la lista los marca como manuales y no como cumplidos.
+Después vienen cuatro pasos **manuales** (IA caída, propuesta y decisión de la Junta, publicación y cierre del día con acta). La propuesta, la Junta y la publicación salen del producto B2B (por definir). El simulador no los controla, así que la lista los marca como manuales y no como cumplidos.
 
 El guion usa el mismo camino que la operación real: no hay rutas de simulación en el backend.
 
@@ -96,15 +98,15 @@ El guion usa el mismo camino que la operación real: no hay rutas de simulación
 
 | Síntoma | Causa probable | Qué hacer |
 |---|---|---|
-| Cancela con "no es el acueducto de demostración". | `is_demo` es falso en el acueducto del slug. | Revisa `CAUDAL_SIM_DEMO_AQUEDUCT_SLUG`. No cambies la marca para forzarlo. |
+| Cancela con "no es la institución simulada". | `is_demo` (B2B: `is_simulated`) es falso en la institución del slug. | Revisa `CAUDAL_SIM_DEMO_AQUEDUCT_SLUG`. No cambies la marca para forzarlo. |
 | `422 TOO_OLD` en cada lectura. | El reloj simulado está lejos de hoy. | Usa `--start` con una fecha reciente. |
 | `401 INVALID_SIGNATURE` en la telemetría. | La clave pública registrada no corresponde a `keys/`. | Ver [Claves y secretos](claves-y-secretos.md), sección 3. |
 | "El buffer sin conexión está lleno". | Hubo demasiado tiempo sin red. | Restablece la red o sube `capacity_batches` en el escenario, y documenta el cambio. |
-| Lecturas "rechazadas" en el resumen. | La API aplicó una regla (rango, horario). | Revisa el mensaje; no fuerces el dato. |
+| Lecturas "rechazadas" en el resumen. | La API aplicó una regla (rango, horario). Hoy; las reglas versionadas salen del modelo B2B (por definir). | Revisa el mensaje; no fuerces el dato. |
 
 ## 7. Maqueta virtual (`caudal-sim maqueta`)
 
-La maqueta virtual es el gemelo de la maqueta física (`caudal-maqueta`, ESP32). Es un dispositivo firmado que habla con la API por el mismo protocolo de [Protocolo de dispositivos](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Protocolo-de-dispositivos.md): firma cada petición con Ed25519, envía la telemetría de nivel y ejecuta los comandos de sus válvulas. Así el lazo "bomba y tanque, nivel, comando, válvula, confirmación" se prueba sin hardware.
+La maqueta virtual es el gemelo de la maqueta física con ESP32 (`caudal-maqueta`). El montaje actual de la maqueta es el Arduino UNO por USB (`caudal-maqueta/docs/arduino-uno.md`), que usa el puente `maqueta-usb` y no esta maqueta virtual. Es un dispositivo firmado que habla con la API por el mismo protocolo de [Protocolo de dispositivos](https://github.com/NicoalsD/caudal-backend/blob/develop/docs/Protocolo-de-dispositivos.md): firma cada petición con Ed25519, envía la telemetría de nivel y ejecuta los comandos de sus válvulas. Así el lazo "bomba y tanque, nivel, comando, válvula, confirmación" se prueba sin hardware.
 
 ### 7.1 Qué hace
 
@@ -127,7 +129,7 @@ La maqueta son **tres dispositivos firmados**, porque así los modela el backend
 2. Generar su par Ed25519 en `keys/` (ignorado por git) y registrar la clave pública con `POST /api/v1/devices/{id}/keys`.
 3. Anotar su identificador en `.env`.
 
-El tanque del dispositivo sensor debe tener la regla de medida de 0 a 0,32 m, porque la telemetría de nivel se valida contra `gauge_min` y `gauge_max`.
+Hoy, el tanque del dispositivo sensor debe tener la regla de medida de 0 a 0,32 m, porque la telemetría de nivel se valida contra `gauge_min` y `gauge_max`. En B2B, el nivel se convierte con la geometría del tanque de la institución (`empty_distance_mm`, `full_distance_mm`) y la regla de medida desaparece (por implementar; la geometría de la maqueta virtual, por definir).
 
 ### 7.3 Variables de entorno
 
@@ -150,11 +152,11 @@ Todo está en `scenarios/maqueta.yaml`, sin valores en el código: área, altura
 
 - **Solo el nivel.** El protocolo no admite una métrica de caudal por salida (`FLOW`), y `VALVE_POSITION` no distingue dos válvulas en un mismo actuador. Por eso la maqueta envía solo `LEVEL`. El caudal sale del modelo, no de una medición: el hueco queda documentado y no se resuelve con datos inventados.
 - **Una lectura por punto.** Cada punto `LEVEL` genera una fila en `ops.readings` del backend. Con el intervalo de 10 s son unas 8.600 lecturas al día. Para una demostración corta está bien; en una corrida larga, sube `telemetry_interval_seconds` en el YAML.
-- **Reglas de validación del backend.** Las lecturas de la maqueta pasan por la misma cadena que cualquier lectura (`Reglas-de-negocio.md`, sección 8). Con los valores de ejemplo de la regla, casi todas las lecturas durante el llenado quedarían `FLAGGED` por `SUDDEN_JUMP`: el llenado de la maqueta sube unos 3,5 m/h (9,5·10⁻⁴ m/s), y el ejemplo de la regla es 0,30 m/h. Con la bomba cortada y sin salidas, el nivel no cambia y el backend puede marcar `SENSOR_FAULT` (valor pegado). Para la maqueta hay que dar a su conjunto de reglas un `max_level_change_per_hour` por encima de ese ritmo y una ventana de duplicados corta. Las lecturas se marcan, no se rechazan.
+- **Reglas de validación del backend.** Las lecturas de la maqueta pasan por la misma cadena que cualquier lectura (`Reglas-de-negocio.md`, sección 8). Con los valores de ejemplo de la regla, casi todas las lecturas durante el llenado quedarían `FLAGGED` por `SUDDEN_JUMP`: el llenado de la maqueta sube unos 3,5 m/h (9,5·10⁻⁴ m/s), y el ejemplo de la regla es 0,30 m/h. Con la bomba cortada y sin salidas, el nivel no cambia y el backend puede marcar `SENSOR_FAULT` (valor pegado). Para la maqueta hay que dar a su conjunto de reglas un `max_level_change_per_hour` por encima de ese ritmo y una ventana de duplicados corta. Las lecturas se marcan, no se rechazan. Hoy; en B2B la validación pasa a anomalías y el límite de cambio sale de `max_level_change_per_minute` en `institution_settings` (por implementar).
 - **Límite de peticiones.** La API permite 60 peticiones por minuto por dispositivo. El intervalo de consulta de 2 s deja holgura. Un `429` no detiene la maqueta: los lotes esperan en el buffer y la consulta se reintenta en el siguiente ciclo.
 - **Apertura en el recorrido.** Una válvula en movimiento se modela con apertura lineal en el tiempo. Si una válvula cambia de sentido a mitad de recorrido, la apertura salta (aproximación del modelo sencillo). En `FAULT` se supone cerrada.
 - **Tiempo real.** La maqueta usa el reloj del equipo, no el reloj simulado de `live`. Con `--seconds` corre esa cantidad de segundos; sin él, corre hasta `Ctrl+C`, y el resumen se imprime al salir.
-- **Sin pantalla en vivo.** La maqueta imprime un resumen al final. Para ver el estado en vivo, usa la aplicación de la Junta o el tablero del backend.
+- **Sin pantalla en vivo.** La maqueta imprime un resumen al final. Para ver el estado en vivo, usa la aplicación de la institución o el tablero del backend.
 
 ### 7.6 Pruebas
 
