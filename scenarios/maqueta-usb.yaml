@@ -24,17 +24,17 @@ servos:
   # tiempo (bloque spin) y open_deg/closed_deg no se usan. Calibrado en banco el 2026-11-20 con
   # `caudal-sim maqueta-usb girar <n> <us> <ms>`: 2000 µs durante 300 ms da un cuarto de vuelta
   # y 1000 µs durante 240 ms la devuelve (al cerrar gira más rápido). La llave solo necesita
-  # unos 15°, así que los tiempos son 15/90 de esos: 50 ms al abrir y 40 ms al cerrar.
+  # unos 12°, así que los tiempos son 12/90 de esos: 40 ms al abrir y 32 ms al cerrar.
   - name: Salida 1
     open_deg: 90
     closed_deg: 0
     hold_torque_after_move: false
-    spin: {open_us: 2000, close_us: 1000, open_ms: 50, close_ms: 40}
+    spin: {open_us: 2000, close_us: 1000, open_ms: 40, close_ms: 32}
   - name: Salida 2
     open_deg: 90
     closed_deg: 0
     hold_torque_after_move: false
-    spin: {open_us: 2000, close_us: 1000, open_ms: 50, close_ms: 40}
+    spin: {open_us: 2000, close_us: 1000, open_ms: 40, close_ms: 32}
 
 valve:
   # Tiempo nominal de maniobra del servo (el UNO lo mueve a 1 grado cada 8 ms).
