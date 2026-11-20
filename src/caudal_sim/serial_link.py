@@ -8,6 +8,7 @@ link speaks its text protocol over USB serial (115200 baud, one line per message
     D           -> D <mm>             (-1 when no echo came back)
     S<n> <deg>  -> OK S<n> <deg>      and later DONE S<n> <deg> when the servo gets there
     R<n>        -> OK R<n>
+    T<n> <us> <ms> -> OK T<n> <us> <ms>  and later DONE T<n> (firmware 1.1.0, 360-degree servo)
 
 Opening the port resets the UNO, so `open_serial_link` waits for its `READY` line. `DONE` lines
 can arrive in the middle of another answer; the link records them and keeps reading.
@@ -17,6 +18,7 @@ can arrive in the middle of another answer; the link records them and keeps read
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from collections.abc import Callable
@@ -26,10 +28,14 @@ from typing import Protocol
 SERVO_COUNT = 2
 MIN_ANGLE_DEG = 0
 MAX_ANGLE_DEG = 180
+MIN_SPIN_PULSE_US = 500
+MAX_SPIN_PULSE_US = 2500
+MAX_SPIN_MS = 10_000
 NO_ECHO_MM = -1
 DEFAULT_ANSWER_TIMEOUT_SECONDS = 2.0
 READY_PREFIX = "READY"
 ENCODING = "ascii"
+TRACE_ENV = "CAUDAL_SIM_SERIAL_TRACE"
 
 
 class SerialLinkError(RuntimeError):
@@ -66,6 +72,7 @@ class SerialLink:
     clock: Callable[[], float] = time.monotonic
     answer_timeout_seconds: float = DEFAULT_ANSWER_TIMEOUT_SECONDS
     _reached: dict[int, int] = field(default_factory=dict, init=False)
+    _spun: set[int] = field(default_factory=set, init=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False)
 
     def wait_ready(self, timeout_seconds: float) -> str:
@@ -104,6 +111,23 @@ class SerialLink:
             self._reached.pop(servo, None)
             self._send(f"S{servo} {angle_deg}")
             self._read_until(lambda text: text.startswith(f"OK S{servo} "))
+
+    def spin_servo(self, servo: int, pulse_us: int, duration_ms: int) -> None:
+        """Turns a continuous-rotation (360-degree) servo: pulses of `pulse_us` (speed and
+        direction) for `duration_ms`. `spin_finished` tells when the UNO stopped it."""
+        _check_servo(servo)
+        if not MIN_SPIN_PULSE_US <= pulse_us <= MAX_SPIN_PULSE_US:
+            raise ValueError("el pulso debe estar entre 500 y 2500 microsegundos")
+        if not 1 <= duration_ms <= MAX_SPIN_MS:
+            raise ValueError("el giro debe durar entre 1 y 10000 milisegundos")
+        with self._lock:
+            self._spun.discard(servo)
+            self._send(f"T{servo} {pulse_us} {duration_ms}")
+            self._read_until(lambda text: text.startswith(f"OK T{servo} "))
+
+    def spin_finished(self, servo: int) -> bool:
+        """Whether the UNO said `DONE T<n>` for `servo` since its last spin."""
+        return servo in self._spun
 
     def release_servo(self, servo: int) -> None:
         """Lets the servo go: it stops holding its position."""
@@ -150,6 +174,12 @@ class SerialLink:
 
     def _record_done(self, text: str) -> None:
         parts = text.split()
+        if len(parts) == 2 and parts[0] == "DONE" and parts[1].startswith("T"):  # noqa: PLR2004
+            try:
+                self._spun.add(int(parts[1][1:]))
+            except ValueError:
+                return
+            return
         if len(parts) == 3 and parts[0] == "DONE" and parts[1].startswith("S"):  # noqa: PLR2004
             try:
                 self._reached[int(parts[1][1:])] = int(parts[2])
@@ -173,13 +203,42 @@ def _check_servo(servo: int) -> None:
         raise ValueError("el servo debe ser 1 o 2")
 
 
+@dataclass
+class TracingPort:
+    """Wraps a port and appends every line sent (`>`) and received (`<`) to a file, with the
+    time. Only for diagnosis on the bench; it never holds secrets, only the UNO protocol."""
+
+    port: SerialPort
+    path: str
+
+    def readline(self) -> bytes:
+        raw = self.port.readline()
+        if raw:
+            self._log("<", raw)
+        return raw
+
+    def write(self, data: bytes, /) -> int | None:
+        self._log(">", data)
+        return self.port.write(data)
+
+    def close(self) -> None:
+        self.port.close()
+
+    def _log(self, direction: str, raw: bytes) -> None:
+        text = raw.decode(ENCODING, errors="replace").strip()
+        stamp = time.strftime("%H:%M:%S") + f".{int(time.time() * 1000) % 1000:03d}"
+        with open(self.path, "a", encoding="utf-8") as trace:
+            trace.write(f"{stamp} {direction} {text}\n")
+
+
 def open_serial_link(
     port_name: str, baud: int, *, ready_timeout_seconds: float, read_timeout_seconds: float = 0.2
 ) -> SerialLink:
     """Opens the USB port and waits until the UNO has booted.
 
     Some boards do not reset when the port opens, so when no `READY` line comes the link
-    still checks the board with a `PING`.
+    still checks the board with a `PING`. With `CAUDAL_SIM_SERIAL_TRACE=<file>` every line of
+    the protocol is appended to that file.
     """
     import serial  # type: ignore[import-untyped]  # noqa: PLC0415 - only hardware commands load it
 
@@ -190,7 +249,8 @@ def open_serial_link(
             f"No se pudo abrir {port_name}: {error}. ¿Está conectado el Arduino? En Linux, tu "
             "usuario debe estar en el grupo dialout."
         ) from error
-    link = SerialLink(port)
+    trace_path = os.environ.get(TRACE_ENV)
+    link = SerialLink(TracingPort(port, trace_path) if trace_path else port)
     try:
         link.wait_ready(ready_timeout_seconds)
     except SerialLinkError:
